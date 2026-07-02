@@ -15,6 +15,21 @@ let isRunning = false;
 let basePitch = 442;     // ファゴットの合奏で一般的な442Hzをデフォルトに設定
 let notation = 'en';     // 英語音名 (Bb, B) に統一
 let viewMode = 'analog'; // 初期表示はアナログメーター
+let wakeLock = null;     // 画面スリープ防止用ロック
+
+/**
+ * 画面のスリープ（消灯）を防止する Wake Lock を要求する
+ */
+async function requestWakeLock() {
+  try {
+    if ('wakeLock' in navigator) {
+      wakeLock = await navigator.wakeLock.request('screen');
+      console.log('Screen Wake Lock is active');
+    }
+  } catch (err) {
+    console.warn(`Wake Lock request failed: ${err.name}, ${err.message}`);
+  }
+}
 
 // DOM要素のキャッシュ
 const welcomeScreen = document.getElementById('welcome-screen');
@@ -69,6 +84,9 @@ async function initAudio() {
     digitalMeter = new DigitalMeter(canvasDigital);
 
     isRunning = true;
+    
+    // 5. 画面スリープ防止ロックを取得
+    await requestWakeLock();
     
     // ウェルカム画面を非表示にする
     welcomeScreen.classList.add('hidden');
@@ -205,3 +223,10 @@ if (btnShowFeatures && btnCloseModal && featuresModal) {
     }
   });
 }
+
+// タブが切り替わって戻ってきたときにWake Lockを再取得する
+document.addEventListener('visibilitychange', async () => {
+  if (wakeLock !== null && document.visibilityState === 'visible' && isRunning) {
+    await requestWakeLock();
+  }
+});
