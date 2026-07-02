@@ -17,6 +17,7 @@ let notation = 'en';     // 英語音名 (Bb, B) に統一
 let viewMode = 'analog'; // 初期表示はアナログメーター
 let wakeLock = null;     // 画面スリープ防止用ロック
 let smoothedFreq = null; // 表示用平滑化周波数 (EMA用)
+let consecutiveFrames = 0; // アタック時のノイズ除去用カウンター
 
 /**
  * 画面のスリープ（消灯）を防止する Wake Lock を要求する
@@ -114,49 +115,69 @@ function tick() {
   const rawFreq = pitchDetector.detectPitch();
   
   if (rawFreq !== null) {
-    // 表示用のEMA平滑化 (音域別可変EMA)
-    if (smoothedFreq === null) {
-      smoothedFreq = rawFreq;
-    } else {
-      let alpha = 0.18; // デフォルト (中間)
-      if (rawFreq <= 100) {
-        alpha = 0.10; // 低音域は強く平滑化（安定重視）
-      } else if (rawFreq >= 300) {
-        alpha = 0.25; // 高音域は弱く平滑化（レスポンス重視）
+    consecutiveFrames++;
+    
+    // 3フレーム連続（約40ms以上）で安定して検知された場合のみ、画面に反映（アタックノイズを無視）
+    if (consecutiveFrames >= 3) {
+      // 表示用のEMA平滑化 (音域別可変EMA)
+      if (smoothedFreq === null) {
+        smoothedFreq = rawFreq;
       } else {
-        // 100Hz〜300Hzの間は線形補間
-        const t = (rawFreq - 100) / 200;
-        alpha = 0.10 + t * (0.25 - 0.10);
+        let alpha = 0.18; // デフォルト (中間)
+        if (rawFreq <= 100) {
+          alpha = 0.10; // 低音域は強く平滑化（安定重視）
+        } else if (rawFreq >= 300) {
+          alpha = 0.25; // 高音域は弱く平滑化（レスポンス重視）
+        } else {
+          // 100Hz〜300Hzの間は線形補間
+          const t = (rawFreq - 100) / 200;
+          alpha = 0.10 + t * (0.25 - 0.10);
+        }
+        
+        // アタック直後（フレーム数が少ない状態）は、さらに平滑化を強めてアタックノイズを吸い込む
+        if (consecutiveFrames < 10) {
+          alpha = alpha * 0.4; 
+        }
+        
+        smoothedFreq = smoothedFreq * (1 - alpha) + rawFreq * alpha;
       }
-      smoothedFreq = smoothedFreq * (1 - alpha) + rawFreq * alpha;
-    }
 
-    const freq = smoothedFreq;
-    const noteNum = getNoteNumber(freq, basePitch);
-    const standardFreq = getStandardFrequency(noteNum, basePitch);
-    const cents = getCentsDeviation(freq, standardFreq);
-    const noteDetails = getNoteDetails(noteNum, notation);
+      const freq = smoothedFreq;
+      const noteNum = getNoteNumber(freq, basePitch);
+      const standardFreq = getStandardFrequency(noteNum, basePitch);
+      const cents = getCentsDeviation(freq, standardFreq);
+      const noteDetails = getNoteDetails(noteNum, notation);
 
-    // UIの更新
-    displayNote.textContent = noteDetails.name;
-    displayOctave.textContent = noteDetails.octave;
-    displayFreq.textContent = freq.toFixed(1);
+      // UIの更新
+      displayNote.textContent = noteDetails.name;
+      displayOctave.textContent = noteDetails.octave;
+      displayFreq.textContent = freq.toFixed(1);
 
-    // ズレの量に応じた文字色クラスのトグル
-    const absCents = Math.abs(cents);
-    if (absCents <= 3) {
-      displayNote.className = 'note-name in-tune';
-    } else if (absCents <= 15) {
-      displayNote.className = 'note-name slightly-off';
+      // ズレの量に応じた文字色クラスのトグル
+      const absCents = Math.abs(cents);
+      if (absCents <= 3) {
+        displayNote.className = 'note-name in-tune';
+      } else if (absCents <= 15) {
+        displayNote.className = 'note-name slightly-off';
+      } else {
+        displayNote.className = 'note-name off-tune';
+      }
+
+      // メーターの更新
+      analogMeter.update(cents, true);
+      digitalMeter.update(cents, true);
     } else {
-      displayNote.className = 'note-name off-tune';
+      // 連続検出回数が足りない間は、無音の表示を維持して暴れを完全に遮断
+      displayNote.textContent = '--';
+      displayNote.className = 'note-name';
+      displayOctave.textContent = '-';
+      displayFreq.textContent = '--.-';
+      analogMeter.update(0, false);
+      digitalMeter.update(0, false);
     }
-
-    // メーターの更新
-    analogMeter.update(cents, true);
-    digitalMeter.update(cents, true);
   } else {
     // 音が検知されなかった場合 (無音状態)
+    consecutiveFrames = 0; // カウントリセット
     smoothedFreq = null; // 平滑化状態をリセット
     
     displayNote.textContent = '--';
