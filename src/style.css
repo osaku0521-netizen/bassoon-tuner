@@ -205,18 +205,18 @@ body {
 
 /* フッター（コントロールパネル） */
 .tuner-footer {
-  padding: 12px 16px; /* 余白を削減 */
+  padding: 8px 16px 12px 16px; /* 要素増に対応するため上下の余白をさらに削減 */
   border-top: 1px solid var(--color-card-border);
   background-color: rgba(6, 9, 17, 0.9);
   display: flex;
   flex-direction: column;
-  gap: 12px; /* 隙間を削減 */
+  gap: 8px; /* 隙間を削減 */
 }
 
 .control-group {
   display: flex;
   flex-direction: column;
-  gap: 4px; /* 隙間を削減 */
+  gap: 2px; /* ラベルとボタン間の隙間を削減 */
 }
 
 .control-label {
@@ -227,7 +227,8 @@ body {
   color: var(--color-text-dim);
 }
 
-/* 表示モードスイッチ */
+/* アルゴリズムスイッチ & 表示モードスイッチ */
+.algorithm-switch,
 .view-switch {
   display: flex;
   background-color: rgba(15, 23, 42, 0.6);

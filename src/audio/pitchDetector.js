@@ -1,39 +1,58 @@
 /**
- * 自己相関法 (Autocorrelation) を用いたピッチ検出クラス
- * ファゴットの低音域 (B♭1: 58Hz) から高音域 (C6: 1000Hz) に特化した設計
+ * 自己相関法 (Autocorrelation) および YIN アルゴリズムを用いたピッチ検出クラス
+ * バスーンの音響特性（低域の基音不足、高次倍音）に特化したフィルターとアルゴリズムを搭載
  */
 export class PitchDetector {
   constructor(audioContext) {
     this.audioContext = audioContext;
     this.analyser = audioContext.createAnalyser();
     
-    // ファゴットの低音域を安定して検知するためにバッファサイズを4096に設定
+    // バスーンの低音域を安定して検知するためにバッファサイズを4096に設定
     this.analyser.fftSize = 4096; 
     this.buffer = new Float32Array(this.analyser.fftSize);
     
-    // バンドパス/ローパスフィルターの適用 (ファゴットの音域外ノイズのカット用)
-    // 50Hz〜1200Hzを通過させるバンドパスフィルターを設定
-    this.filter = audioContext.createBiquadFilter();
-    this.filter.type = 'bandpass';
-    this.filter.frequency.value = 350; // 中心周波数 (ファゴットの中音域付近)
-    this.filter.Q.value = 0.5; // なだらかなQでノイズを抑える
+    // デフォルトの検出アルゴリズム
+    this.algorithm = 'yin'; 
+
+    // 1. ハイパスフィルター (40Hz) - 空調ノイズや超低周波ノイズをカット
+    this.hpFilter = audioContext.createBiquadFilter();
+    this.hpFilter.type = 'highpass';
+    this.hpFilter.frequency.value = 40;
+
+    // 2. ローパスフィルター (1200Hz) - 音質を保ちつつ高次倍音と高音域の無関係なノイズをカット
+    this.lpFilter = audioContext.createBiquadFilter();
+    this.lpFilter.type = 'lowpass';
+    this.lpFilter.frequency.value = 1200;
   }
 
   /**
-   * 検出器に入力を接続する
+   * 検出器に入力を接続する (直列接続: source -> HP -> LP -> Analyser)
    * @param {AudioNode} sourceNode 
    */
   connect(sourceNode) {
-    sourceNode.connect(this.filter);
-    this.filter.connect(this.analyser);
+    sourceNode.connect(this.hpFilter);
+    this.hpFilter.connect(this.lpFilter);
+    this.lpFilter.connect(this.analyser);
   }
 
   /**
    * 接続を解除する
    */
   disconnect() {
-    this.filter.disconnect();
+    this.hpFilter.disconnect();
+    this.lpFilter.disconnect();
     this.analyser.disconnect();
+  }
+
+  /**
+   * 検出アルゴリズムを設定する
+   * @param {'yin' | 'autocorrelation'} type 
+   */
+  setAlgorithm(type) {
+    if (type === 'yin' || type === 'autocorrelation') {
+      this.algorithm = type;
+      console.log(`Algorithm switched to: ${type}`);
+    }
   }
 
   /**
@@ -42,30 +61,122 @@ export class PitchDetector {
    */
   detectPitch() {
     this.analyser.getFloatTimeDomainData(this.buffer);
-    return this.autoCorrelate(this.buffer, this.audioContext.sampleRate);
+    
+    if (this.algorithm === 'yin') {
+      return this.detectPitchYIN(this.buffer, this.audioContext.sampleRate);
+    } else {
+      return this.autoCorrelate(this.buffer, this.audioContext.sampleRate);
+    }
   }
 
   /**
-   * 自己相関法によるピッチ検出アルゴリズム
+   * YIN ピッチ検出アルゴリズム (累積平均正規化差分関数を用いた高度な検出)
+   * 倍音成分（オクターブエラー）に対して極めて堅牢
    * @param {Float32Array} buffer 音声波形バッファ
    * @param {number} sampleRate サンプリングレート (Hz)
    * @returns {number|null}
    */
-  autoCorrelate(buffer, sampleRate) {
-    // 1. 信号の音量（RMS: 二乗平均平方根）を計算し、無音時は処理をスキップ
+  detectPitchYIN(buffer, sampleRate) {
+    // 1. RMS計算による無音検知
     let sum = 0;
     for (let i = 0; i < buffer.length; i++) {
       sum += buffer[i] * buffer[i];
     }
     const rms = Math.sqrt(sum / buffer.length);
-    
-    // 閾値以下の極めて小さい音は検知しない (マイクの無音時ノイズ防止)
     if (rms < 0.008) {
       return null;
     }
 
-    // 2. 信号全体の最大振幅を求め、中心クリッピングの閾値を設定
-    // これにより倍音成分による影響（オクターブエラー）を軽減します
+    const minFreq = 50;
+    const maxFreq = 1200;
+    
+    // YINでは探索用のシグナルサイズ W をバッファの半分とします (ラグを含めてバッファ内に収まるようにするため)
+    const W = Math.floor(buffer.length / 2);
+    const maxLag = Math.min(Math.floor(sampleRate / minFreq), W);
+    const minLag = Math.floor(sampleRate / maxFreq);
+
+    // 2. 差分関数 d(tau) の計算
+    const d = new Float32Array(maxLag);
+    for (let tau = 0; tau < maxLag; tau++) {
+      let sumD = 0;
+      for (let t = 0; t < W; t++) {
+        const diff = buffer[t] - buffer[t + tau];
+        sumD += diff * diff;
+      }
+      d[tau] = sumD;
+    }
+
+    // 3. 累積平均正規化差分 d'(tau) の計算 (YINの中核ロジック)
+    const dPrime = new Float32Array(maxLag);
+    dPrime[0] = 1;
+    let runningSum = 0;
+    for (let tau = 1; tau < maxLag; tau++) {
+      runningSum += d[tau];
+      dPrime[tau] = d[tau] / (runningSum / tau);
+    }
+
+    // 4. 絶対閾値によるラグ (周期) の決定
+    const threshold = 0.15; // YINの標準的な閾値 (0.1 〜 0.15)
+    let bestLag = -1;
+
+    // 閾値を下回り、かつ極小値（ローカルミニマム）となる最初のラグを探す
+    for (let tau = minLag; tau < maxLag - 1; tau++) {
+      if (dPrime[tau] < threshold) {
+        if (dPrime[tau] < dPrime[tau - 1] && dPrime[tau] < dPrime[tau + 1]) {
+          bestLag = tau;
+          break;
+        }
+      }
+    }
+
+    // 閾値を下回る極小値が見つからない場合は、全体の最小値（グローバルミニマム）を選択
+    if (bestLag === -1) {
+      let minVal = 999;
+      for (let tau = minLag; tau < maxLag; tau++) {
+        if (dPrime[tau] < minVal) {
+          minVal = dPrime[tau];
+          bestLag = tau;
+        }
+      }
+    }
+
+    // 範囲外チェック
+    if (bestLag <= 0 || bestLag >= maxLag - 1) {
+      return null;
+    }
+
+    // 5. 放物線補間 (Parabolic Interpolation) による精密な周波数決定
+    const alpha = dPrime[bestLag - 1];
+    const beta = dPrime[bestLag];
+    const gamma = dPrime[bestLag + 1];
+
+    const p = 0.5 * (alpha - gamma) / (alpha - 2 * beta + gamma);
+    const preciseLag = bestLag + p;
+    const frequency = sampleRate / preciseLag;
+
+    if (frequency >= minFreq && frequency <= maxFreq) {
+      return frequency;
+    }
+
+    return null;
+  }
+
+  /**
+   * 自己相関法 (Autocorrelation) によるピッチ検出アルゴリズム
+   * @param {Float32Array} buffer 音声波形バッファ
+   * @param {number} sampleRate サンプリングレート (Hz)
+   * @returns {number|null}
+   */
+  autoCorrelate(buffer, sampleRate) {
+    let sum = 0;
+    for (let i = 0; i < buffer.length; i++) {
+      sum += buffer[i] * buffer[i];
+    }
+    const rms = Math.sqrt(sum / buffer.length);
+    if (rms < 0.008) {
+      return null;
+    }
+
     let maxVal = -1;
     let minVal = 1;
     for (let i = 0; i < buffer.length; i++) {
@@ -84,20 +195,16 @@ export class PitchDetector {
       }
     }
 
-    // 3. ファゴットの音域に合わせた探索ラグの範囲を計算
-    // 50Hz (最低) から 1200Hz (最高) の範囲を探索
     const minFreq = 50;
     const maxFreq = 1200;
     const maxLag = Math.min(Math.floor(sampleRate / minFreq), buffer.length);
     const minLag = Math.floor(sampleRate / maxFreq);
 
-    // 自己相関値を計算
     const r = new Float32Array(maxLag);
     let maxR = -999;
     
     for (let lag = minLag; lag < maxLag; lag++) {
       let sumR = 0;
-      // バッファオーバーフローを防ぎつつ相関をとる
       const limit = buffer.length - lag;
       for (let i = 0; i < limit; i++) {
         sumR += clippedBuffer[i] * clippedBuffer[i + lag];
@@ -108,18 +215,14 @@ export class PitchDetector {
       }
     }
 
-    // 相関ピークの探索
-    // 単に「最大値」を選ぶとオクターブエラーが生じやすいため、
-    // 最大ピークの90%以上の強さを持つ最初のローカルピーク（一番長い周期＝最も低い基音）を見つけます。
     const peakThreshold = maxR * 0.85;
     let bestLag = -1;
 
     for (let lag = minLag; lag < maxLag - 1; lag++) {
-      // ローカルピーク（極大値）の判定
       if (r[lag] > r[lag - 1] && r[lag] > r[lag + 1]) {
         if (r[lag] > peakThreshold) {
           bestLag = lag;
-          break; // 最も長い周期（低音）を優先するため、最初に見つかった適合ラグで確定
+          break;
         }
       }
     }
@@ -128,19 +231,14 @@ export class PitchDetector {
       return null;
     }
 
-    // 放物線補間 (Parabolic Interpolation) による精度の向上
-    // ラグのインデックスは整数だが、その前後の値からより正確な小数のラグ位置を推定する
     const alpha = r[bestLag - 1];
     const beta = r[bestLag];
     const gamma = r[bestLag + 1];
     
     const p = 0.5 * (alpha - gamma) / (alpha - 2 * beta + gamma);
     const preciseLag = bestLag + p;
-
-    // 周波数を算出
     const frequency = sampleRate / preciseLag;
 
-    // 最終防衛ライン: ファゴットの現実的な周波数範囲内かチェック
     if (frequency >= minFreq && frequency <= maxFreq) {
       return frequency;
     }
