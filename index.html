@@ -1,0 +1,128 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <!-- モバイル端末向けにズーム禁止とサイズ制限を設定 -->
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <title>Bassoon Tuner</title>
+  
+  <!-- バスーンのリードを描画したSVG Favicon -->
+  <link rel="icon" type="image/svg+xml" href="data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'><path d='M22 6h20l-5 28H27z' fill='%23ead2ac' stroke='%23c2a67d' stroke-width='2' stroke-linejoin='round'/><path d='M25 34q7-2 14 0v18q-7 2-14 0z' fill='%23ef4444' stroke='%23b91c1c' stroke-width='1.5' stroke-linejoin='round'/><rect x='25.5' y='38' width='13' height='2' rx='1' fill='%2394a3b8'/><rect x='25.5' y='44' width='13' height='2' rx='1' fill='%2394a3b8'/><rect x='26.5' y='50' width='11' height='2' rx='1' fill='%2394a3b8'/><rect x='28' y='52' width='8' height='6' fill='%2364748b'/></svg>">
+  
+  <!-- Google Fonts のインポート (Outfit, JetBrains Mono) -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600;700&family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  
+  <!-- モバイルWeb PWA（フルスクリーン対応）設定 -->
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+</head>
+<body>
+  <div id="app" class="tuner-app">
+    <!-- ウェルカム／マイク開始画面 -->
+    <div id="welcome-screen" class="overlay">
+      <div class="welcome-card">
+        <h1 class="welcome-title">Bassoon Tuner</h1>
+        <p class="welcome-desc">
+          バスーンの音域・倍音特性に最適化された<br>
+          クロマティックチューナー
+        </p>
+        <button id="btn-start" class="btn btn-primary btn-lg">
+          チューナーを起動する
+        </button>
+        <!-- こだわり表示ボタン -->
+        <button id="btn-show-features" class="btn btn-secondary btn-md">
+          このチューナーのこだわり
+        </button>
+        <p class="welcome-hint">※マイクの使用許可が必要です</p>
+      </div>
+
+      <!-- 特徴モーダル -->
+      <div id="features-modal" class="modal-overlay hidden">
+        <div class="modal-content">
+          <h2 class="modal-title">Bassoon Tuner のこだわり</h2>
+          <div class="modal-body">
+            <section class="feature-sec">
+              <h3>1. オクターブエラーの徹底対策</h3>
+              <p>バスーンの低音域は、基音（本来の音）よりも第2倍音（1オクターブ上の音）の方が圧倒的に強い音響的特性を持っています。本アプリでは最大振幅の35%以下を無効化する「中心クリッピング」と、最大の波の重なりから「最も周期が長い（低い音）波」を優先して決定するアルゴリズムを導入し、オクターブ高く誤検出される現象を劇的に抑えています。</p>
+            </section>
+            
+            <section class="feature-sec">
+              <h3>2. 帯域制限フィルター</h3>
+              <p>バスーンの実用音域（B♭1:約58Hz 〜 B♭5:約932Hz）外の不要な環境ノイズをカットするため、前段に350Hz付近を中心としたデジタルバンドパスフィルターを設置。エアコンの低周波音や周囲の雑音によるメーターのブレを軽減します。</p>
+            </section>
+
+            <section class="feature-sec">
+              <h3>3. Raw Audio（生音声）の取り込み</h3>
+              <p>ブラウザやOSが通話用に施す自動音量補正（AGC）や簡易ノイズキャンセラーは、楽器のロングトーンをノイズと誤認して音を途切れさせてしまいます。本アプリはこれらを明示的にすべて無効化し、マイクが捉えた楽器本来の音波をダイレクトに分析します。</p>
+            </section>
+
+            <section class="feature-sec sources">
+              <h3>学術的根拠 / 参照元</h3>
+              <ul>
+                <li><strong>GSU HyperPhysics (Woodwind Acoustics)</strong>: バスーンの音響測定データおよび基音と倍音のエネルギー比率の分析結果。</li>
+                <li><strong>科学的ピッチ表記法 (Scientific Pitch Notation)</strong>: 各音名（B♭1〜B♭5）に対応する標準周波数の算出根拠。</li>
+                <li><strong>各管楽器メーカーの音響研究報告</strong>: ダブルリード特有の管体内共鳴・フォルマント特性に関するデータ。</li>
+              </ul>
+            </section>
+          </div>
+          <button id="btn-close-modal" class="btn btn-close">閉じる</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- メインチューナーUI -->
+    <header class="app-header">
+      <div class="header-brand">
+        <span class="brand-title">Bassoon Tuner</span>
+      </div>
+    </header>
+
+    <main class="tuner-main">
+      <!-- 検出されたピッチと音名表示エリア -->
+      <div class="note-display-card">
+        <div id="display-octave" class="note-octave">-</div>
+        <div id="display-note" class="note-name">--</div>
+        <div class="freq-display">
+          <span id="display-freq">--.-</span><span class="freq-unit">Hz</span>
+        </div>
+      </div>
+
+      <!-- メーターコンポーネント用コンテナ -->
+      <div class="meter-container">
+        <!-- アナログメーター (Canvas) -->
+        <canvas id="canvas-analog" class="meter-canvas active"></canvas>
+        
+        <!-- デジタルメーター (Canvas) -->
+        <canvas id="canvas-digital" class="meter-canvas"></canvas>
+      </div>
+    </main>
+
+    <footer class="tuner-footer">
+      <!-- メーターモード切り替え (アナログ / デジタル) -->
+      <div class="control-group">
+        <label class="control-label">表示モード</label>
+        <div class="view-switch">
+          <button id="btn-mode-analog" class="btn-tab active">アナログ</button>
+          <button id="btn-mode-digital" class="btn-tab">デジタル</button>
+        </div>
+      </div>
+
+      <!-- 基準ピッチ切り替え (440Hz 〜 444Hz) -->
+      <div class="control-group">
+        <label class="control-label">基準ピッチ (A4)</label>
+        <div class="pitch-selector">
+          <button class="btn-pitch" data-pitch="440">440</button>
+          <button class="btn-pitch" data-pitch="441">441</button>
+          <button class="btn-pitch active" data-pitch="442">442</button>
+          <button class="btn-pitch" data-pitch="443">443</button>
+          <button class="btn-pitch" data-pitch="444">444</button>
+        </div>
+      </div>
+    </footer>
+  </div>
+
+  <script type="module" src="/src/main.js"></script>
+</body>
+</html>

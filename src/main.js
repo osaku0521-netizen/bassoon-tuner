@@ -1,0 +1,207 @@
+import './style.css';
+import { PitchDetector } from './audio/pitchDetector.js';
+import { getNoteNumber, getStandardFrequency, getCentsDeviation, getNoteDetails } from './audio/notes.js';
+import { AnalogMeter } from './components/analogMeter.js';
+import { DigitalMeter } from './components/digitalMeter.js';
+
+// グローバル状態管理
+let audioContext = null;
+let mediaStream = null;
+let pitchDetector = null;
+let analogMeter = null;
+let digitalMeter = null;
+
+let isRunning = false;
+let basePitch = 442;     // ファゴットの合奏で一般的な442Hzをデフォルトに設定
+let notation = 'en';     // 英語音名 (Bb, B) に統一
+let viewMode = 'analog'; // 初期表示はアナログメーター
+
+// DOM要素のキャッシュ
+const welcomeScreen = document.getElementById('welcome-screen');
+const btnStart = document.getElementById('btn-start');
+const displayNote = document.getElementById('display-note');
+const displayOctave = document.getElementById('display-octave');
+const displayFreq = document.getElementById('display-freq');
+
+// 特徴モーダル要素
+const btnShowFeatures = document.getElementById('btn-show-features');
+const btnCloseModal = document.getElementById('btn-close-modal');
+const featuresModal = document.getElementById('features-modal');
+
+// 表示モードボタン
+const btnModeAnalog = document.getElementById('btn-mode-analog');
+const btnModeDigital = document.getElementById('btn-mode-digital');
+const canvasAnalog = document.getElementById('canvas-analog');
+const canvasDigital = document.getElementById('canvas-digital');
+
+// 基準ピッチボタン
+const pitchButtons = document.querySelectorAll('.btn-pitch');
+
+/**
+ * オーディオシステムの初期化とマイクの取得
+ */
+async function initAudio() {
+  try {
+    // 1. AudioContext の初期化 (iOS/Safari対策のためユーザーインタラクション内で実行)
+    const AudioContextClass = window.AudioContext || window.webkitAudioContext;
+    audioContext = new AudioContextClass();
+
+    // 2. マイクの使用許可取得
+    // 音質補正機能（エコーキャンセラー、ノイズサプレッサー、自動ゲイン調整）は
+    // ピッチ検出の波形を歪ませるため、すべて false に設定します
+    mediaStream = await navigator.mediaDevices.getUserMedia({
+      audio: {
+        echoCancellation: false,
+        noiseSuppression: false,
+        autoGainControl: false
+      },
+      video: false
+    });
+
+    const source = audioContext.createMediaStreamSource(mediaStream);
+    
+    // 3. ピッチ検出器の初期化と接続
+    pitchDetector = new PitchDetector(audioContext);
+    pitchDetector.connect(source);
+
+    // 4. メーターコンポーネントの初期化
+    analogMeter = new AnalogMeter(canvasAnalog);
+    digitalMeter = new DigitalMeter(canvasDigital);
+
+    isRunning = true;
+    
+    // ウェルカム画面を非表示にする
+    welcomeScreen.classList.add('hidden');
+    
+    // アニメーションループ開始
+    tick();
+  } catch (error) {
+    console.error('マイクの取得に失敗しました:', error);
+    alert('マイクのアクセス許可が必要です。設定を確認してリトライしてください。');
+  }
+}
+
+/**
+ * アニメーション＆ピッチ検出ループ
+ */
+function tick() {
+  if (!isRunning) return;
+
+  // 1. ピッチ検出
+  const freq = pitchDetector.detectPitch();
+  
+  if (freq !== null) {
+    // 周波数が検出された場合
+    const noteNum = getNoteNumber(freq, basePitch);
+    const standardFreq = getStandardFrequency(noteNum, basePitch);
+    const cents = getCentsDeviation(freq, standardFreq);
+    const noteDetails = getNoteDetails(noteNum, notation);
+
+    // UIの更新
+    displayNote.textContent = noteDetails.name;
+    displayOctave.textContent = noteDetails.octave;
+    displayFreq.textContent = freq.toFixed(1);
+
+    // ズレの量に応じた文字色クラスのトグル
+    const absCents = Math.abs(cents);
+    if (absCents <= 3) {
+      displayNote.className = 'note-name in-tune';
+    } else if (absCents <= 15) {
+      displayNote.className = 'note-name slightly-off';
+    } else {
+      displayNote.className = 'note-name off-tune';
+    }
+
+    // メーターの更新
+    analogMeter.update(cents, true);
+    digitalMeter.update(cents, true);
+  } else {
+    // 音が検知されなかった場合 (無音状態)
+    displayNote.textContent = '--';
+    displayNote.className = 'note-name';
+    displayOctave.textContent = '-';
+    displayFreq.textContent = '--.-';
+
+    // メーターに「無信号」状態を伝える
+    analogMeter.update(0, false);
+    digitalMeter.update(0, false);
+  }
+
+  // 2. メーターの描画更新
+  if (viewMode === 'analog') {
+    analogMeter.draw();
+  } else {
+    digitalMeter.draw();
+  }
+
+  requestAnimationFrame(tick);
+}
+
+// ==========================================
+// イベントリスナーの登録
+// ==========================================
+
+// チューナー開始
+btnStart.addEventListener('click', () => {
+  if (audioContext && audioContext.state === 'suspended') {
+    audioContext.resume();
+  }
+  initAudio();
+});
+
+// 表示モード切り替え (アナログ / デジタル)
+btnModeAnalog.addEventListener('click', () => {
+  viewMode = 'analog';
+  btnModeAnalog.classList.add('active');
+  btnModeDigital.classList.remove('active');
+  
+  canvasAnalog.classList.add('active');
+  canvasDigital.classList.remove('active');
+  
+  // サイズ変更に対応させる
+  if (analogMeter) analogMeter.resize();
+});
+
+btnModeDigital.addEventListener('click', () => {
+  viewMode = 'digital';
+  btnModeDigital.classList.add('active');
+  btnModeAnalog.classList.remove('active');
+  
+  canvasDigital.classList.add('active');
+  canvasAnalog.classList.remove('active');
+  
+  // サイズ変更に対応させる
+  if (digitalMeter) digitalMeter.resize();
+});
+
+// 基準ピッチ切り替え
+pitchButtons.forEach(button => {
+  button.addEventListener('click', (e) => {
+    // すべてのボタンのアクティブクラスを解除
+    pitchButtons.forEach(btn => btn.classList.remove('active'));
+    
+    // クリックされたボタンをアクティブにする
+    button.classList.add('active');
+    
+    // 基準ピッチの更新
+    basePitch = parseInt(button.dataset.pitch, 10);
+  });
+});
+
+// こだわりモーダルの開閉
+if (btnShowFeatures && btnCloseModal && featuresModal) {
+  btnShowFeatures.addEventListener('click', () => {
+    featuresModal.classList.remove('hidden');
+  });
+  
+  btnCloseModal.addEventListener('click', () => {
+    featuresModal.classList.add('hidden');
+  });
+
+  // モーダルの外側タップでも閉じるようにする
+  featuresModal.addEventListener('click', (e) => {
+    if (e.target === featuresModal) {
+      featuresModal.classList.add('hidden');
+    }
+  });
+}

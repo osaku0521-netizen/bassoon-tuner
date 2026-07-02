@@ -1,0 +1,529 @@
+:root {
+  /* モダンで洗練されたディープダークテーマカラー */
+  --color-bg: #090d16;
+  --color-card-bg: rgba(18, 26, 43, 0.7);
+  --color-card-border: rgba(255, 255, 255, 0.05);
+  
+  /* ゴールドテーマカラー定義 */
+  --color-theme: #d4af37;
+  --color-theme-glow: rgba(212, 175, 55, 0.25);
+  
+  /* シチュエーションごとのインジケータカラー (ネオン) */
+  --color-accent-emerald: #10b981; /* チューニング正解表示用として維持 */
+  --color-accent-amber: #f59e0b;
+  --color-accent-red: #ef4444;
+  
+  --color-text: #f8fafc;
+  --color-text-dim: #64748b;
+  --color-text-muted: #475569;
+  
+  --font-main: 'Outfit', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  --font-mono: 'JetBrains Mono', monospace;
+  
+  --shadow-glow: 0 0 20px var(--color-theme-glow);
+  --transition-smooth: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+  
+  /* モバイル向けセーフエリア考慮 */
+  --safe-area-top: env(safe-area-inset-top, 0px);
+  --safe-area-bottom: env(safe-area-inset-bottom, 0px);
+}
+
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+  -webkit-user-select: none; /* テキスト選択を無効化しアプリ感覚に */
+  user-select: none;
+  -webkit-tap-highlight-color: transparent; /* タップ時の枠線を消す */
+}
+
+body {
+  font-family: var(--font-main);
+  background-color: var(--color-bg);
+  color: var(--color-text);
+  overflow: hidden;
+  height: 100vh;
+  height: 100dvh;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+/* アプリケーションコンテナ */
+.tuner-app {
+  width: 100%;
+  max-width: 480px; /* モバイル最適化サイズ */
+  height: 100dvh; /* 画面全体の高さに完全にフィットさせる */
+  background: radial-gradient(circle at top, #111a2e 0%, var(--color-bg) 100%);
+  display: flex;
+  flex-direction: column;
+  position: relative;
+  /* ノッチおよび下部ホームインジケータ部分のセーフエリアを設定 */
+  padding-top: var(--safe-area-top);
+  padding-bottom: var(--safe-area-bottom);
+  overflow: hidden; /* アプリ全体で不要なスクロールを絶対防止 */
+}
+
+/* ヘッダー */
+.app-header {
+  height: 50px; /* 高さを少しコンパクトに */
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0 16px;
+  border-bottom: 1px solid var(--color-card-border);
+}
+
+.header-brand {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.brand-title {
+  font-size: 18px;
+  font-weight: 700;
+  letter-spacing: -0.5px;
+  background: linear-gradient(135deg, #f8fafc 0%, #94a3b8 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+.brand-badge {
+  font-size: 9px;
+  font-weight: 600;
+  padding: 1px 5px;
+  background-color: rgba(16, 185, 129, 0.15);
+  color: var(--color-accent-emerald);
+  border-radius: 99px;
+  border: 1px solid rgba(16, 185, 129, 0.2);
+}
+
+/* メインコンテンツエリア */
+.tuner-main {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  align-items: center;
+  padding: 12px 16px;
+  gap: 12px;
+  min-height: 0; /* 子要素の縮小を許可し、はみ出しを防ぐ */
+}
+
+/* 音名表示カード */
+.note-display-card {
+  width: 100%;
+  height: 22%; /* 画面全体の高さに対する割合で設定 */
+  min-height: 90px;
+  max-height: 130px; /* 高さを小さく制限 */
+  background-color: var(--color-card-bg);
+  border: 1px solid var(--color-card-border);
+  border-radius: 20px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  position: relative;
+  box-shadow: inset 0 0 20px rgba(255, 255, 255, 0.02);
+  backdrop-filter: blur(10px);
+}
+
+.note-octave {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--color-text-dim);
+  position: absolute;
+  top: 12px;
+  right: 18px;
+  font-family: var(--font-mono);
+}
+
+.note-name {
+  font-size: 58px; /* カードサイズ縮小に合わせて最適化 */
+  font-weight: 700;
+  letter-spacing: -2px;
+  line-height: 1;
+  margin-bottom: 2px;
+  color: var(--color-text);
+  text-shadow: 0 0 30px rgba(255, 255, 255, 0.05);
+  transition: color 0.15s ease;
+}
+
+/* チューニングが合っている時のエフェクトクラス */
+.note-name.in-tune {
+  color: var(--color-accent-emerald);
+  text-shadow: 0 0 35px rgba(16, 185, 129, 0.4);
+}
+.note-name.slightly-off {
+  color: var(--color-accent-amber);
+  text-shadow: 0 0 35px rgba(245, 158, 11, 0.3);
+}
+.note-name.off-tune {
+  color: var(--color-accent-red);
+}
+
+.freq-display {
+  font-family: var(--font-mono);
+  font-size: 14px;
+  color: var(--color-text-dim);
+  font-weight: 500;
+}
+
+.freq-unit {
+  font-size: 10px;
+  color: var(--color-text-muted);
+  margin-left: 2px;
+}
+
+/* メーターエリア */
+.meter-container {
+  width: 100%;
+  flex: 2.2; /* メーターエリアの比重をさらに増やして最大化 */
+  min-height: 0; /* はみ出し防止に必須 */
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  position: relative;
+}
+
+.meter-canvas {
+  width: 100%;
+  height: 100%;
+  position: absolute;
+  opacity: 0;
+  transform: scale(0.96);
+  pointer-events: none;
+  transition: opacity 0.3s cubic-bezier(0.4, 0, 0.2, 1), transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.meter-canvas.active {
+  opacity: 1;
+  transform: scale(1);
+  pointer-events: auto;
+}
+
+/* フッター（コントロールパネル） */
+.tuner-footer {
+  padding: 12px 16px; /* 余白を削減 */
+  border-top: 1px solid var(--color-card-border);
+  background-color: rgba(6, 9, 17, 0.9);
+  display: flex;
+  flex-direction: column;
+  gap: 12px; /* 隙間を削減 */
+}
+
+.control-group {
+  display: flex;
+  flex-direction: column;
+  gap: 4px; /* 隙間を削減 */
+}
+
+.control-label {
+  font-size: 10px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  color: var(--color-text-dim);
+}
+
+/* 表示モードスイッチ */
+.view-switch {
+  display: flex;
+  background-color: rgba(15, 23, 42, 0.6);
+  border: 1px solid var(--color-card-border);
+  border-radius: 12px;
+  padding: 3px;
+}
+
+.btn-tab {
+  flex: 1;
+  background: none;
+  border: none;
+  color: var(--color-text-dim);
+  font-family: var(--font-main);
+  font-size: 12px;
+  font-weight: 600;
+  padding: 8px 0; /* パディングを削減 */
+  border-radius: 9px;
+  cursor: pointer;
+  transition: var(--transition-smooth);
+}
+
+.btn-tab.active {
+  background-color: var(--color-card-bg);
+  border: 1px solid var(--color-card-border);
+  color: var(--color-text);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+}
+
+/* 基準ピッチセレクタ */
+.pitch-selector {
+  display: flex;
+  gap: 6px;
+}
+
+.btn-pitch {
+  flex: 1;
+  background-color: rgba(15, 23, 42, 0.4);
+  border: 1px solid var(--color-card-border);
+  color: var(--color-text-dim);
+  font-family: var(--font-mono);
+  font-size: 12px;
+  font-weight: 600;
+  padding: 8px 0; /* パディングを削減 */
+  border-radius: 12px;
+  cursor: pointer;
+  transition: var(--transition-smooth);
+}
+
+.btn-pitch.active {
+  background-color: rgba(212, 175, 55, 0.1);
+  border-color: var(--color-theme);
+  color: var(--color-theme);
+  box-shadow: var(--shadow-glow);
+}
+
+/* 開始オーバーレイ画面 */
+.overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background-color: #090d16;
+  z-index: 100;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  padding: 30px;
+  transition: opacity 0.4s ease, visibility 0.4s;
+}
+
+.overlay.hidden {
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+}
+
+.welcome-card {
+  width: 100%;
+  max-width: 320px;
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 20px;
+}
+
+.welcome-title {
+  font-size: 32px;
+  font-weight: 700;
+  letter-spacing: -1px;
+  background: linear-gradient(135deg, #ffffff 30%, var(--color-theme) 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+.welcome-desc {
+  font-size: 14px;
+  color: var(--color-text-dim);
+  line-height: 1.6;
+}
+
+.bassoon-icon-container {
+  width: 120px;
+  height: 120px;
+  background: radial-gradient(circle, rgba(16, 185, 129, 0.08) 0%, rgba(0,0,0,0) 70%);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+.bassoon-svg {
+  width: 80px;
+  height: 80px;
+  filter: drop-shadow(0 4px 12px rgba(16, 185, 129, 0.15));
+}
+
+.btn {
+  border: none;
+  font-family: var(--font-main);
+  font-weight: 600;
+  cursor: pointer;
+  display: inline-flex;
+  justify-content: center;
+  align-items: center;
+  transition: var(--transition-smooth);
+}
+
+.btn-primary {
+  background-color: var(--color-theme);
+  color: #090d16;
+  box-shadow: 0 8px 24px var(--color-theme-glow);
+}
+
+.btn-primary:active {
+  transform: scale(0.97);
+  background-color: #bfa030;
+}
+
+.btn-lg {
+  padding: 16px 32px;
+  font-size: 16px;
+  border-radius: 16px;
+  width: 100%;
+}
+
+.welcome-hint {
+  font-size: 11px;
+  color: var(--color-text-muted);
+}
+
+.btn-secondary {
+  background-color: rgba(255, 255, 255, 0.05);
+  border: 1px solid var(--color-card-border);
+  color: var(--color-text);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+}
+
+.btn-secondary:active {
+  transform: scale(0.97);
+  background-color: rgba(255, 255, 255, 0.1);
+}
+
+.btn-md {
+  padding: 10px 20px;
+  font-size: 13px;
+  border-radius: 12px;
+  width: 100%;
+}
+
+/* モーダルオーバーレイ */
+.modal-overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background-color: rgba(6, 9, 17, 0.85);
+  backdrop-filter: blur(15px);
+  z-index: 110;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  padding: 20px;
+  transition: opacity 0.3s ease, visibility 0.3s;
+}
+
+.modal-overlay.hidden {
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+}
+
+/* モーダルコンテンツ */
+.modal-content {
+  width: 100%;
+  max-width: 360px;
+  height: 80%;
+  max-height: 480px;
+  background-color: #0e1626;
+  border: 1px solid var(--color-card-border);
+  border-radius: 24px;
+  padding: 24px;
+  display: flex;
+  flex-direction: column;
+  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.5);
+}
+
+.modal-title {
+  font-size: 18px;
+  font-weight: 700;
+  margin-bottom: 16px;
+  text-align: center;
+  background: linear-gradient(135deg, #ffffff 30%, var(--color-theme) 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+.modal-body {
+  flex: 1;
+  overflow-y: auto; /* はみ出した場合にスクロールできるように */
+  padding-right: 4px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+/* スクロールバーのカスタマイズ */
+.modal-body::-webkit-scrollbar {
+  width: 4px;
+}
+.modal-body::-webkit-scrollbar-track {
+  background: rgba(255, 255, 255, 0.02);
+}
+.modal-body::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.15);
+  border-radius: 99px;
+}
+
+.feature-sec {
+  border-bottom: 1px solid rgba(255, 255, 255, 0.05); /* 項目間の区切りを追加 */
+  padding-bottom: 12px;
+}
+
+.feature-sec:last-of-type {
+  border-bottom: none;
+  padding-bottom: 0;
+}
+
+.feature-sec h3 {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--color-theme);
+  margin-bottom: 8px;
+}
+
+.feature-sec p {
+  font-size: 12.5px; /* 11.5px -> 12.5px */
+  color: #e2e8f0; /* コントラスト向上のため、明るいライトグレーに修正 */
+  line-height: 1.75; /* 行間を広げて読みやすく */
+}
+
+.feature-sec.sources h3 {
+  color: var(--color-accent-amber);
+}
+
+.feature-sec.sources ul {
+  list-style-type: none;
+  padding-left: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 10px; /* 隙間を拡大 */
+}
+
+.feature-sec.sources li {
+  font-size: 12px; /* 11px -> 12px */
+  color: #cbd5e1; /* より明るいグレー */
+  line-height: 1.6;
+}
+
+.feature-sec.sources strong {
+  color: #f8fafc;
+}
+
+.btn-close {
+  margin-top: 16px;
+  background-color: rgba(255, 255, 255, 0.08);
+  border: 1px solid var(--color-card-border);
+  color: var(--color-text);
+  padding: 10px 0;
+  font-size: 13px;
+  border-radius: 12px;
+  width: 100%;
+}
+
+.btn-close:active {
+  background-color: rgba(255, 255, 255, 0.15);
+}
