@@ -27,6 +27,10 @@ const ALPHA_MAP = {
   stable: 0.08
 };
 
+// 信頼度ゲート制御用の閾値定数
+const CONFIDENCE_THRESHOLD = 0.80; // 安定して追従する基準閾値
+const CONFIDENCE_MIN = 0.65;       // メーター更新を完全に切り捨てる最低信頼度
+
 /**
  * 画面のスリープ（消灯）を防止する Wake Lock を要求する
  */
@@ -130,8 +134,8 @@ function tick() {
   if (result !== null) {
     const { frequency: rawFreq, confidence } = result;
 
-    // 信頼度ゲート: 0.80未満は更新を無視（ノイズ等を防ぎ、前回のメーター位置や音名をキープ）
-    if (confidence >= 0.80) {
+    // 信頼度が最低基準値（0.65）を満たしているかチェック
+    if (confidence >= CONFIDENCE_MIN) {
       consecutiveFrames++;
       
       // 3フレーム連続（約40ms以上）で安定して検知された場合のみ、画面に反映（アタックノイズを無視）
@@ -147,6 +151,15 @@ function tick() {
         // アタック直後（フレーム数が少ない状態）は、さらに平滑化を強めてアタックノイズを吸い込む
         if (consecutiveFrames < 10) {
           alpha = alpha * 0.4; 
+        }
+        
+        // 信頼度を平滑化係数（alpha）へ動的に反映
+        // 信頼度が低いグレーゾーン（0.65〜0.80）のフレームは、完全に捨てる代わりに
+        // 平滑化強度を大幅に引き上げ（alphaを小さくし）、極めてゆっくりとメーターを追従させます。
+        if (confidence < CONFIDENCE_THRESHOLD) {
+          const ratio = (confidence - CONFIDENCE_MIN) / (CONFIDENCE_THRESHOLD - CONFIDENCE_MIN); // 0.0 〜 1.0
+          const confidenceScale = 0.1 + ratio * 0.9; // 信頼度に応じて 10% 〜 100% に alpha をスケールダウン
+          alpha = alpha * confidenceScale;
         }
         
         if (smoothedCents === null) {
@@ -199,9 +212,8 @@ function tick() {
         digitalMeter.update(0, false);
       }
     } else {
-      // 信頼度が低いフレームは「無視」する
-      // メーターの更新 (update) をスキップして前回の目標値をキープするが、
-      // メーターの描画 (draw) 自体はtick末尾で動き続けるため、針は滑らかに前回の安定した位置を維持します。
+      // 信頼度が極端に低い（0.65未満）完全なノイズは「無視（＝以前の安定状態をキープ）」する
+      // メーターの更新 (update) をスキップし、針は滑らかに前回の安定した位置を維持します。
     }
   } else {
     // 音が検知されなかった場合 (無音状態)
