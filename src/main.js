@@ -132,11 +132,10 @@ function tick() {
     
     // 3フレーム連続（約40ms以上）で安定して検知された場合のみ、画面に反映（アタックノイズを無視）
     if (consecutiveFrames >= 3) {
-      // 1. 生の周波数からピッチ情報と生のセント値を計算
-      const noteNum = getNoteNumber(rawFreq, basePitch);
-      const standardFreq = getStandardFrequency(noteNum, basePitch);
-      const rawCents = getCentsDeviation(rawFreq, standardFreq);
-      const noteDetails = getNoteDetails(noteNum, notation);
+      // 1. セント計算用の基準周波数を生の周波数から一時計算
+      const rawNoteNum = getNoteNumber(rawFreq, basePitch);
+      const rawStandardFreq = getStandardFrequency(rawNoteNum, basePitch);
+      const rawCents = getCentsDeviation(rawFreq, rawStandardFreq);
 
       // 2. セント値をEMAで平滑化 (UX改善: 音域に依存しない均一な平滑化)
       let alpha = ALPHA_MAP[currentResponseSpeed];
@@ -164,12 +163,14 @@ function tick() {
         smoothedFreq = smoothedFreq * 0.8 + rawFreq * 0.2;
       }
 
-      const freq = smoothedFreq;
+      // 4. 平滑化された周波数から音名表示を決定 (音名チラつき/チャタリング防止)
+      const displayNoteNum = getNoteNumber(smoothedFreq, basePitch);
+      const noteDetails = getNoteDetails(displayNoteNum, notation);
 
       // UIの更新
       displayNote.textContent = noteDetails.name;
       displayOctave.textContent = noteDetails.octave;
-      displayFreq.textContent = freq.toFixed(1);
+      displayFreq.textContent = smoothedFreq.toFixed(1);
 
       // ズレの量に応じた文字色クラスのトグル
       const absCents = Math.abs(smoothedCents);
