@@ -28,8 +28,8 @@ const ALPHA_MAP = {
 };
 
 // 信頼度ゲート制御用の閾値定数
-const CONFIDENCE_THRESHOLD = 0.80; // 安定して追従する基準閾値
-const CONFIDENCE_MIN = 0.65;       // メーター更新を完全に切り捨てる最低信頼度
+const CONFIDENCE_THRESHOLD = 0.72; // 安定して追従する基準閾値 (ファゴットの低音特性に配慮して引き下げ)
+const CONFIDENCE_MIN = 0.55;       // メーター更新を完全に切り捨てる最低信頼度
 
 /**
  * 画面のスリープ（消灯）を防止する Wake Lock を要求する
