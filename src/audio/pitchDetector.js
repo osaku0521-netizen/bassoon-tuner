@@ -153,9 +153,12 @@ export class PitchDetector {
     const p = 0.5 * (alpha - gamma) / (alpha - 2 * beta + gamma);
     const preciseLag = bestLag + p;
     const frequency = sampleRate / preciseLag;
+    
+    // 累積平均正規化差分 d' の値から信頼度を算出 (1.0 - d' の値を 0.0〜1.0 にクランプ)
+    const confidence = Math.max(0, Math.min(1.0, 1.0 - dPrime[bestLag]));
 
     if (frequency >= minFreq && frequency <= maxFreq) {
-      return frequency;
+      return { frequency, confidence };
     }
 
     return null;
@@ -239,8 +242,15 @@ export class PitchDetector {
     const preciseLag = bestLag + p;
     const frequency = sampleRate / preciseLag;
 
+    // クリッピング後信号のエネルギーで自己相関値を正規化して信頼度を算出 (0.0〜1.0 にクランプ)
+    let energy = 0;
+    for (let i = 0; i < clippedBuffer.length; i++) {
+      energy += clippedBuffer[i] * clippedBuffer[i];
+    }
+    const confidence = energy > 0 ? Math.max(0, Math.min(1.0, r[bestLag] / energy)) : 0;
+
     if (frequency >= minFreq && frequency <= maxFreq) {
-      return frequency;
+      return { frequency, confidence };
     }
 
     return null;

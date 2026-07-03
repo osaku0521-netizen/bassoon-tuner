@@ -125,74 +125,83 @@ function tick() {
   if (!isRunning) return;
 
   // 1. ピッチ検出
-  const rawFreq = pitchDetector.detectPitch();
+  const result = pitchDetector.detectPitch();
   
-  if (rawFreq !== null) {
-    consecutiveFrames++;
-    
-    // 3フレーム連続（約40ms以上）で安定して検知された場合のみ、画面に反映（アタックノイズを無視）
-    if (consecutiveFrames >= 3) {
-      // 1. セント計算用の基準周波数を生の周波数から一時計算
-      const rawNoteNum = getNoteNumber(rawFreq, basePitch);
-      const rawStandardFreq = getStandardFrequency(rawNoteNum, basePitch);
-      const rawCents = getCentsDeviation(rawFreq, rawStandardFreq);
+  if (result !== null) {
+    const { frequency: rawFreq, confidence } = result;
 
-      // 2. セント値をEMAで平滑化 (UX改善: 音域に依存しない均一な平滑化)
-      let alpha = ALPHA_MAP[currentResponseSpeed];
+    // 信頼度ゲート: 0.80未満は更新を無視（ノイズ等を防ぎ、前回のメーター位置や音名をキープ）
+    if (confidence >= 0.80) {
+      consecutiveFrames++;
       
-      // アタック直後（フレーム数が少ない状態）は、さらに平滑化を強めてアタックノイズを吸い込む
-      if (consecutiveFrames < 10) {
-        alpha = alpha * 0.4; 
-      }
-      
-      if (smoothedCents === null) {
-        smoothedCents = rawCents;
-      } else {
-        // オクターブエラーや急激な音程変化（ジャンプ）があった場合は、平滑化をリセットして即座に追従
-        if (Math.abs(rawCents - smoothedCents) > 40) {
+      // 3フレーム連続（約40ms以上）で安定して検知された場合のみ、画面に反映（アタックノイズを無視）
+      if (consecutiveFrames >= 3) {
+        // 1. セント計算用の基準周波数を生の周波数から一時計算
+        const rawNoteNum = getNoteNumber(rawFreq, basePitch);
+        const rawStandardFreq = getStandardFrequency(rawNoteNum, basePitch);
+        const rawCents = getCentsDeviation(rawFreq, rawStandardFreq);
+
+        // 2. セント値をEMAで平滑化 (UX改善: 音域に依存しない均一な平滑化)
+        let alpha = ALPHA_MAP[currentResponseSpeed];
+        
+        // アタック直後（フレーム数が少ない状態）は、さらに平滑化を強めてアタックノイズを吸い込む
+        if (consecutiveFrames < 10) {
+          alpha = alpha * 0.4; 
+        }
+        
+        if (smoothedCents === null) {
           smoothedCents = rawCents;
         } else {
-          smoothedCents = smoothedCents * (1 - alpha) + rawCents * alpha;
+          // オクターブエラーや急激な音程変化（ジャンプ）があった場合は、平滑化をリセットして即座に追従
+          if (Math.abs(rawCents - smoothedCents) > 40) {
+            smoothedCents = rawCents;
+          } else {
+            smoothedCents = smoothedCents * (1 - alpha) + rawCents * alpha;
+          }
         }
-      }
 
-      // 3. 表示周波数自体も激しいブレを防ぐためマイルドに平滑化
-      if (smoothedFreq === null) {
-        smoothedFreq = rawFreq;
+        // 3. 表示周波数自体も激しいブレを防ぐためマイルドに平滑化
+        if (smoothedFreq === null) {
+          smoothedFreq = rawFreq;
+        } else {
+          smoothedFreq = smoothedFreq * 0.8 + rawFreq * 0.2;
+        }
+
+        // 4. 平滑化された周波数から音名表示を決定 (音名チラつき/チャタリング防止)
+        const displayNoteNum = getNoteNumber(smoothedFreq, basePitch);
+        const noteDetails = getNoteDetails(displayNoteNum, notation);
+
+        // UIの更新
+        displayNote.textContent = noteDetails.name;
+        displayOctave.textContent = noteDetails.octave;
+        displayFreq.textContent = smoothedFreq.toFixed(1);
+
+        // ズレの量に応じた文字色クラスのトグル
+        const absCents = Math.abs(smoothedCents);
+        if (absCents <= 3) {
+          displayNote.className = 'note-name in-tune';
+        } else if (absCents <= 15) {
+          displayNote.className = 'note-name slightly-off';
+        } else {
+          displayNote.className = 'note-name off-tune';
+        }
+
+        // メーターの更新 (平滑化されたセント値を渡す)
+        analogMeter.update(smoothedCents, true);
+        digitalMeter.update(smoothedCents, true);
       } else {
-        smoothedFreq = smoothedFreq * 0.8 + rawFreq * 0.2;
+        // 連続検出回数が足りない間は、無音の表示を維持して暴れを完全に遮断
+        displayNote.textContent = '--';
+        displayNote.className = 'note-name';
+        displayOctave.textContent = '-';
+        displayFreq.textContent = '--.-';
+        analogMeter.update(0, false);
+        digitalMeter.update(0, false);
       }
-
-      // 4. 平滑化された周波数から音名表示を決定 (音名チラつき/チャタリング防止)
-      const displayNoteNum = getNoteNumber(smoothedFreq, basePitch);
-      const noteDetails = getNoteDetails(displayNoteNum, notation);
-
-      // UIの更新
-      displayNote.textContent = noteDetails.name;
-      displayOctave.textContent = noteDetails.octave;
-      displayFreq.textContent = smoothedFreq.toFixed(1);
-
-      // ズレの量に応じた文字色クラスのトグル
-      const absCents = Math.abs(smoothedCents);
-      if (absCents <= 3) {
-        displayNote.className = 'note-name in-tune';
-      } else if (absCents <= 15) {
-        displayNote.className = 'note-name slightly-off';
-      } else {
-        displayNote.className = 'note-name off-tune';
-      }
-
-      // メーターの更新 (平滑化されたセント値を渡す)
-      analogMeter.update(smoothedCents, true);
-      digitalMeter.update(smoothedCents, true);
     } else {
-      // 連続検出回数が足りない間は、無音の表示を維持して暴れを完全に遮断
-      displayNote.textContent = '--';
-      displayNote.className = 'note-name';
-      displayOctave.textContent = '-';
-      displayFreq.textContent = '--.-';
-      analogMeter.update(0, false);
-      digitalMeter.update(0, false);
+      // 信頼度が低いフレームは「無視」する
+      // メーターの更新 (update) をスキップして前回の目標値をキープするが、
+      // メーターの描画 (draw) 自体はtick末尾で動き続けるため、針は滑らかに前回の安定した位置を維持します。
     }
   } else {
     // 音が検知されなかった場合 (無音状態)
