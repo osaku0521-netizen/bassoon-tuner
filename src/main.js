@@ -150,15 +150,15 @@ function tick() {
         
         // アタック直後（フレーム数が少ない状態）は、さらに平滑化を強めてアタックノイズを吸い込む
         if (consecutiveFrames < 10) {
-          alpha = alpha * 0.4; 
+          alpha = alpha * 0.6; // 二重減衰による極端なフリーズを防ぐため、0.4から0.6へ緩和
         }
         
         // 信頼度を平滑化係数（alpha）へ動的に反映
         // 信頼度が低いグレーゾーン（0.65〜0.80）のフレームは、完全に捨てる代わりに
-        // 平滑化強度を大幅に引き上げ（alphaを小さくし）、極めてゆっくりとメーターを追従させます。
+        // 平滑化強度を強めて、ゆっくりとメーターを追従させます。
         if (confidence < CONFIDENCE_THRESHOLD) {
           const ratio = (confidence - CONFIDENCE_MIN) / (CONFIDENCE_THRESHOLD - CONFIDENCE_MIN); // 0.0 〜 1.0
-          const confidenceScale = 0.1 + ratio * 0.9; // 信頼度に応じて 10% 〜 100% に alpha をスケールダウン
+          const confidenceScale = 0.5 + ratio * 0.5; // 減衰の下限を10%から50%へ引き上げて応答性を改善
           alpha = alpha * confidenceScale;
         }
         
