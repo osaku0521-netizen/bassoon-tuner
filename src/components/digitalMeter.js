@@ -24,7 +24,7 @@ export class DigitalMeter {
    * キャンバスサイズ調整
    */
   resize() {
-    const rect = this.canvas.getBoundingClientRect();
+    const rect = this.canvas.parentElement.getBoundingClientRect();
     const dpr = window.devicePixelRatio || 1;
     
     this.width = rect.width;
@@ -32,6 +32,8 @@ export class DigitalMeter {
     
     this.canvas.width = this.width * dpr;
     this.canvas.height = this.height * dpr;
+    this.canvas.style.width = `${this.width}px`;
+    this.canvas.style.height = `${this.height}px`;
     
     this.ctx.scale(dpr, dpr);
   }
