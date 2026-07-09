@@ -24,6 +24,7 @@ let metroBpm = 120;
 let metroBeats = 4;
 let isMetroPlaying = false;
 let tapTimes = []; // タップテンポの時刻履歴
+let metroBeatQueue = []; // 音と同期して表示拍を切り替えるためのタイムスタンプキュー
 
 let isRunning = false;
 let basePitch = 442;     // ファゴットの合奏で一般的な442Hzをデフォルトに設定
@@ -65,6 +66,7 @@ const btnStart = document.getElementById('btn-start');
 const displayNote = document.getElementById('display-note');
 const displayOctave = document.getElementById('display-octave');
 const displayFreq = document.getElementById('display-freq');
+const displayMetroBeat = document.getElementById('display-metro-beat');
 
 // 特徴モーダル要素
 const btnShowFeatures = document.getElementById('btn-show-features');
@@ -265,6 +267,22 @@ function tick() {
     // メトロノーム表示時のアニメーション描画
     // ------------------------------------------
     const currentTime = audioContext ? audioContext.currentTime : 0;
+    
+    // 音の再生予定時刻に合わせて表示上の拍番号（1, 2, 3, 4）を切り替える
+    while (metroBeatQueue.length > 0 && currentTime >= metroBeatQueue[0].time) {
+      const activeBeatInfo = metroBeatQueue.shift();
+      const currentBeatIdx = activeBeatInfo.beatNumber;
+      
+      if (displayMetroBeat) {
+        displayMetroBeat.textContent = currentBeatIdx + 1;
+        if (currentBeatIdx === 0) {
+          displayMetroBeat.className = 'metro-beat-display accent';
+        } else {
+          displayMetroBeat.className = 'metro-beat-display normal-beat';
+        }
+      }
+    }
+
     if (metroViewMode === 'analog') {
       if (pendulumMetronome) pendulumMetronome.draw(currentTime, metroBpm, isMetroPlaying);
     } else {
@@ -465,11 +483,21 @@ function startMetronome() {
   btnMetronomeToggle.classList.remove('btn-primary');
   btnMetronomeToggle.classList.add('btn-secondary');
   
+  // 拍同期キューをリセットし、初期状態を「準備中（-）」にする
+  metroBeatQueue = [];
+  if (displayMetroBeat) {
+    displayMetroBeat.textContent = '-';
+    displayMetroBeat.className = 'metro-beat-display';
+  }
+  
   metronomeScheduler.setBpm(metroBpm);
   metronomeScheduler.setBeatsPerMeasure(metroBeats);
   
   // スケジュール完了コールバックを同期
   metronomeScheduler.start((beatNumber, time) => {
+    // 描画と発音同期のため、予定時刻をキューに積む
+    metroBeatQueue.push({ beatNumber, time });
+    
     if (pendulumMetronome) pendulumMetronome.registerBeat(beatNumber, time, metroBpm);
     if (digitalMetronome) digitalMetronome.registerBeat(beatNumber, time, metroBeats);
   });
@@ -485,6 +513,13 @@ function stopMetronome() {
   btnMetronomeToggle.classList.remove('btn-secondary');
   btnMetronomeToggle.classList.add('btn-primary');
   metronomeScheduler.stop();
+  
+  // キューをクリアし表示をリセット
+  metroBeatQueue = [];
+  if (displayMetroBeat) {
+    displayMetroBeat.textContent = '-';
+    displayMetroBeat.className = 'metro-beat-display';
+  }
 }
 
 // 再生ボタン

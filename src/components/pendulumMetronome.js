@@ -85,9 +85,9 @@ export class PendulumMetronome {
       const angleMultiplier = -Math.cos(progress * Math.PI); // -1 (左端) 〜 1 (右端)
       this.currentAngle = this.direction * this.maxAngle * angleMultiplier;
     } else {
-      // 停止時はバーがスムーズに中央（直立）へ戻るようにイージングをかける
-      this.currentAngle = this.currentAngle * 0.85;
-      if (Math.abs(this.currentAngle) < 0.001) this.currentAngle = 0;
+      // 停止時はスイング開始待機状態として左端（-maxAngle）へスムーズに移動し待機する
+      this.currentAngle = this.currentAngle * 0.85 + (-this.maxAngle) * 0.15;
+      if (Math.abs(this.currentAngle - (-this.maxAngle)) < 0.001) this.currentAngle = -this.maxAngle;
     }
     
     const centerX = width / 2;

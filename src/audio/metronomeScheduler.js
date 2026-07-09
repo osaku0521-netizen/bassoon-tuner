@@ -44,8 +44,9 @@ export class MetronomeScheduler {
     this.isPlaying = true;
     this.onBeat = onBeatCallback;
     this.currentBeat = 0;
-    // 開始直後は現在より少し先の時刻をセットして、確実に最初の音が遅れずに出るようにします
-    this.nextNoteTime = this.audioContext.currentTime + 0.05;
+    // 最初の拍の音が鳴るまでに丸々1拍分の予備スイング時間を設け、テンポの予測を容易にします
+    const secondsPerBeat = 60.0 / this.bpm;
+    this.nextNoteTime = this.audioContext.currentTime + secondsPerBeat;
     
     const runScheduler = () => {
       this.scheduler();
