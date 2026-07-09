@@ -48,6 +48,11 @@ export class MetronomeScheduler {
     const secondsPerBeat = 60.0 / this.bpm;
     this.nextNoteTime = this.audioContext.currentTime + secondsPerBeat;
     
+    // アナログメーターの動き出しタイミングを合わせるため、開始した瞬間に最初の拍情報を登録します
+    if (this.onBeat) {
+      this.onBeat(0, this.nextNoteTime);
+    }
+    
     const runScheduler = () => {
       this.scheduler();
       if (this.isPlaying) {

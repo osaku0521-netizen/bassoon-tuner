@@ -10,6 +10,7 @@ export class DigitalMetronome {
     this.activeBeat = -1;       // 現在アクティブな拍 (0 〜 beatsPerMeasure-1)
     this.beatsPerMeasure = 4;   // 1小節内の拍数
     this.lastTriggerTime = 0;   // 拍がトリガーされた高精度タイムスタンプ
+    this.pendingBeat = null;    // ルックアヘッドによる先行スケジュールをバッファする変数
     
     this.resize();
   }
@@ -38,9 +39,17 @@ export class DigitalMetronome {
    * @param {number} beatsPerMeasure 
    */
   registerBeat(beatNumber, time, beatsPerMeasure) {
-    this.activeBeat = beatNumber;
     this.beatsPerMeasure = beatsPerMeasure;
-    this.lastTriggerTime = time;
+    
+    // 初回登録時
+    if (this.lastTriggerTime === 0) {
+      this.activeBeat = beatNumber;
+      this.lastTriggerTime = time;
+      this.pendingBeat = null;
+    } else {
+      // 2回目以降は、現在進行中のビートタイミングを邪魔しないようにバッファへ留める
+      this.pendingBeat = { beatNumber, time };
+    }
   }
 
   /**
@@ -54,6 +63,20 @@ export class DigitalMetronome {
       this.resize();
       // リサイズ後もサイズが0なら描画をスキップしてレイアウト確定を待つ
       if (this.width === 0 || this.height === 0) return;
+    }
+
+    // 拍の切り替えタイミング監視（バッファから昇格）
+    if (isPlaying && this.pendingBeat && currentTime >= this.pendingBeat.time) {
+      this.activeBeat = this.pendingBeat.beatNumber;
+      this.lastTriggerTime = this.pendingBeat.time;
+      this.pendingBeat = null;
+    }
+
+    // 停止時は状態リセット
+    if (!isPlaying) {
+      this.lastTriggerTime = 0;
+      this.activeBeat = -1;
+      this.pendingBeat = null;
     }
 
     const ctx = this.ctx;

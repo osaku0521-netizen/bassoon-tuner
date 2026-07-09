@@ -16,6 +16,9 @@ export class PendulumMetronome {
     this.maxAngle = 0.42;    // 最大振れ幅 (ラジアン, 約24度)
     this.currentAngle = 0;   // 現在の振り子の角度
     
+    this.beatsPerMeasure = 4;
+    this.pendingBeat = null; // ルックアヘッドによる先行スケジュールをバッファする変数
+    
     this.resize();
   }
 
@@ -43,12 +46,19 @@ export class PendulumMetronome {
    * @param {number} bpm 
    */
   registerBeat(beatNumber, time, bpm) {
-    this.beatDuration = 60.0 / bpm;
-    // 直前の拍の時間と、次の拍の予定時間を登録
-    this.lastBeatTime = time - this.beatDuration;
-    this.nextBeatTime = time;
-    // 拍ごとに方向を反転させる (偶数拍は右、奇数拍は左へ端に到達)
-    this.direction = beatNumber % 2 === 0 ? 1 : -1;
+    const beatDuration = 60.0 / bpm;
+    
+    // 停止中からの開始時、または初回の登録時
+    if (this.nextBeatTime === 0 || this.lastBeatTime === 0) {
+      this.beatDuration = beatDuration;
+      this.lastBeatTime = time - beatDuration;
+      this.nextBeatTime = time;
+      this.direction = 1; // 初回は左端からスタートして右端（direction = 1）へ向けてスイングする
+      this.pendingBeat = null;
+    } else {
+      // スイング中の場合は、現在のスイングが完了するまで新しい拍をバッファに留める（ガタつき・ワープ防止）
+      this.pendingBeat = { beatNumber, time, beatDuration };
+    }
   }
 
   /**
@@ -63,6 +73,23 @@ export class PendulumMetronome {
       this.resize();
       // リサイズ後もサイズが0なら描画をスキップしてレイアウト確定を待つ
       if (this.width === 0 || this.height === 0) return;
+    }
+
+    // 拍の切り替えタイミング監視（バッファから昇格）
+    // 現在時刻が予定時刻（nextBeatTime）に達した瞬間に、次の予定スイングに滑らかに遷移させる
+    if (isPlaying && this.pendingBeat && currentTime >= this.nextBeatTime) {
+      this.lastBeatTime = this.nextBeatTime;
+      this.nextBeatTime = this.pendingBeat.time;
+      this.beatDuration = this.pendingBeat.beatDuration;
+      
+      // 1拍子の場合は単純に毎回方向を反転させることで、1拍子でも左右にダイナミックにスイングさせる
+      if (this.beatsPerMeasure === 1) {
+        this.direction = -this.direction;
+      } else {
+        this.direction = this.pendingBeat.beatNumber % 2 === 0 ? 1 : -1;
+      }
+      
+      this.pendingBeat = null;
     }
 
     const ctx = this.ctx;
@@ -88,6 +115,11 @@ export class PendulumMetronome {
       // 停止時はスイング開始待機状態として左端（-maxAngle）へスムーズに移動し待機する
       this.currentAngle = this.currentAngle * 0.85 + (-this.maxAngle) * 0.15;
       if (Math.abs(this.currentAngle - (-this.maxAngle)) < 0.001) this.currentAngle = -this.maxAngle;
+      
+      // 停止時は同期用状態もリセット
+      this.lastBeatTime = 0;
+      this.nextBeatTime = 0;
+      this.pendingBeat = null;
     }
     
     const centerX = width / 2;

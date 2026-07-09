@@ -466,6 +466,10 @@ function startMetronome() {
   btnMetronomeToggle.classList.remove('btn-primary');
   btnMetronomeToggle.classList.add('btn-secondary');
   
+  // メトロノームオブジェクトに最新の拍数を同期
+  if (pendulumMetronome) pendulumMetronome.beatsPerMeasure = metroBeats;
+  if (digitalMetronome) digitalMetronome.beatsPerMeasure = metroBeats;
+  
   metronomeScheduler.setBpm(metroBpm);
   metronomeScheduler.setBeatsPerMeasure(metroBeats);
   
@@ -567,6 +571,9 @@ beatButtons.forEach(button => {
     button.classList.add('active');
     
     metroBeats = parseInt(button.dataset.beat, 10);
+    if (pendulumMetronome) pendulumMetronome.beatsPerMeasure = metroBeats;
+    if (digitalMetronome) digitalMetronome.beatsPerMeasure = metroBeats;
+    
     if (metronomeScheduler) {
       metronomeScheduler.setBeatsPerMeasure(metroBeats);
     }
