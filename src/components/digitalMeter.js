@@ -74,6 +74,12 @@ export class DigitalMeter {
    * 描画処理
    */
   draw() {
+    // 描画サイズが未確定、または0の場合は自己修復リサイズを実行
+    if (!this.width || !this.height || this.width === 0 || this.height === 0) {
+      this.resize();
+      if (this.width === 0 || this.height === 0) return;
+    }
+
     // デジタルメーターも滑らかなイージングで追従
     const easing = this.isTuning ? 0.2 : 0.1;
     this.currentCents += (this.targetCents - this.currentCents) * easing;

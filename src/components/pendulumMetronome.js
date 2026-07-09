@@ -58,6 +58,13 @@ export class PendulumMetronome {
    * @param {boolean} isPlaying 
    */
   draw(currentTime, bpm, isPlaying) {
+    // 描画サイズが未確定、または0の場合は自己修復リサイズを実行
+    if (!this.width || !this.height || this.width === 0 || this.height === 0) {
+      this.resize();
+      // リサイズ後もサイズが0なら描画をスキップしてレイアウト確定を待つ
+      if (this.width === 0 || this.height === 0) return;
+    }
+
     const ctx = this.ctx;
     const width = this.width;
     const height = this.height;
@@ -148,7 +155,7 @@ export class PendulumMetronome {
     ctx.beginPath();
     ctx.moveTo(centerX, centerY);
     ctx.lineTo(rodEndX, rodEndY);
-    ctx.strokeStyle = 'var(--color-theme)'; // ゴールド
+    ctx.strokeStyle = '#d4af37'; // ゴールド
     ctx.lineWidth = 3.5;
     ctx.lineCap = 'round';
     ctx.stroke();
@@ -175,7 +182,7 @@ export class PendulumMetronome {
     ctx.closePath();
     ctx.fillStyle = '#f1f5f9'; // シャープなシルバーの遊錘
     ctx.fill();
-    ctx.strokeStyle = 'var(--color-theme)';
+    ctx.strokeStyle = '#d4af37';
     ctx.lineWidth = 1.5;
     ctx.stroke();
     
@@ -194,7 +201,7 @@ export class PendulumMetronome {
     ctx.arc(centerX, centerY, 7.5, 0, 2 * Math.PI);
     ctx.fillStyle = '#b5952b';
     ctx.fill();
-    ctx.strokeStyle = 'var(--color-theme)';
+    ctx.strokeStyle = '#d4af37';
     ctx.lineWidth = 1;
     ctx.stroke();
   }

@@ -264,7 +264,7 @@ function tick() {
     // ------------------------------------------
     // メトロノーム表示時のアニメーション描画
     // ------------------------------------------
-    const currentTime = audioContext.currentTime;
+    const currentTime = audioContext ? audioContext.currentTime : 0;
     if (metroViewMode === 'analog') {
       if (pendulumMetronome) pendulumMetronome.draw(currentTime, metroBpm, isMetroPlaying);
     } else {

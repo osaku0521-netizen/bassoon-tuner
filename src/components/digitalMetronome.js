@@ -49,6 +49,13 @@ export class DigitalMetronome {
    * @param {boolean} isPlaying 
    */
   draw(currentTime, isPlaying) {
+    // 描画サイズが未確定、または0の場合は自己修復リサイズを実行
+    if (!this.width || !this.height || this.width === 0 || this.height === 0) {
+      this.resize();
+      // リサイズ後もサイズが0なら描画をスキップしてレイアウト確定を待つ
+      if (this.width === 0 || this.height === 0) return;
+    }
+
     const ctx = this.ctx;
     const width = this.width;
     const height = this.height;
@@ -103,17 +110,17 @@ export class DigitalMetronome {
       
       if (isCurrent) {
         // 点灯状態: ネオン風ゴールドグラデーション
-        ctx.shadowColor = 'var(--color-theme)';
+        ctx.shadowColor = '#d4af37';
         ctx.shadowBlur = 16;
         
         const grad = ctx.createRadialGradient(x, y, 1.5, x, y, radius);
         if (isFirstBeat) {
           grad.addColorStop(0, '#ffffff');
           grad.addColorStop(0.35, '#fcf6ba');
-          grad.addColorStop(1, 'var(--color-theme)');
+          grad.addColorStop(1, '#d4af37');
         } else {
           grad.addColorStop(0, '#ffffff');
-          grad.addColorStop(0.4, 'var(--color-theme)');
+          grad.addColorStop(0.4, '#d4af37');
           grad.addColorStop(1, '#b5952b');
         }
         ctx.fillStyle = grad;

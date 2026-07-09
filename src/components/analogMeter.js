@@ -69,6 +69,12 @@ export class AnalogMeter {
    * メーターの描画ループ（外部の requestAnimationFrame から呼び出される）
    */
   draw() {
+    // 描画サイズが未確定、または0の場合は自己修復リサイズを実行
+    if (!this.width || !this.height || this.width === 0 || this.height === 0) {
+      this.resize();
+      if (this.width === 0 || this.height === 0) return;
+    }
+
     // 針の動きをイージングで滑らかにする
     // 反応速度と滑らかさのバランスをとるため、イージング係数を調整
     const easing = this.isTuning ? 0.12 : 0.08;
