@@ -152,16 +152,10 @@
     <!-- メトロノーム・ビューパネル -->
     <div id="metronome-view" class="view-panel">
       <main class="metronome-main">
-        <!-- テンポ（BPM）と拍数表示エリア -->
+        <!-- テンポ（BPM）数値表示エリア -->
         <div class="bpm-display-card">
-          <div class="bpm-info">
-            <div id="display-bpm" class="bpm-number">120</div>
-            <div class="bpm-label">BPM</div>
-          </div>
-          <div class="beat-counter-wrapper">
-            <div id="display-metro-beat" class="metro-beat-display">-</div>
-            <div class="beat-counter-label">BEAT</div>
-          </div>
+          <div id="display-bpm" class="bpm-number">120</div>
+          <div class="bpm-label">BPM</div>
         </div>
 
         <!-- アナログ/デジタルメトロノーム Canvas -->
@@ -201,6 +195,7 @@
           <div class="control-group">
             <label class="control-label">拍子</label>
             <div class="beats-selector">
+              <button class="btn-pitch btn-beat" data-beat="1">1</button>
               <button class="btn-pitch btn-beat" data-beat="2">2</button>
               <button class="btn-pitch btn-beat" data-beat="3">3</button>
               <button class="btn-pitch btn-beat active" data-beat="4">4</button>
