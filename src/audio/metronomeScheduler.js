@@ -100,30 +100,64 @@ export class MetronomeScheduler {
    * @param {number} time 
    */
   scheduleNote(beatNumber, time) {
-    const osc = this.audioContext.createOscillator();
-    const gainNode = this.audioContext.createGain();
+    const duration = 0.07; // 70ms の長さで音響エネルギーを稼ぐ
     
-    osc.connect(gainNode);
-    gainNode.connect(this.audioContext.destination);
+    // 1. メインオシレーター (三角波)
+    const osc1 = this.audioContext.createOscillator();
+    osc1.type = 'triangle';
     
-    // サイン波よりも倍音が豊かで管楽器の演奏中でも耳通りが良い「三角波（triangle）」を採用
-    osc.type = 'triangle';
+    // 2. 最もエネルギー密度の高い「矩形波」を1オクターブ上の倍音としてブレンドし、音圧とアタックの抜けを極限まで強化
+    const osc2 = this.audioContext.createOscillator();
+    osc2.type = 'square';
     
-    // 周波数を少し高めに設定して耳への通りをさらに改善
+    let baseFreq = 900;
     if (beatNumber === 0) {
-      osc.frequency.value = 1200; // 1拍目 (高音の鋭いクリック)
+      baseFreq = 1200; // 1拍目 (高周波の鋭いアクセントクリック)
     } else {
-      osc.frequency.value = 900;  // 2拍目以降 (少し低めのクリック)
+      baseFreq = 900;  // 2拍目以降
     }
     
-    // アタックとリリースの精密スケジュール (最大ゲインを 1.0 に設定)
-    const duration = 0.07; // 70ms にわずかに伸ばして音圧（エネルギー）を確保
-    gainNode.gain.setValueAtTime(0, time);
-    gainNode.gain.linearRampToValueAtTime(1.0, time + 0.001); // 1ms の超鋭いアタックで「カチッ」というアタック感を極限まで高める
-    gainNode.gain.exponentialRampToValueAtTime(0.001, time + duration); // リリース
+    osc1.frequency.value = baseFreq;
+    osc2.frequency.value = baseFreq * 2; // 1オクターブ上 (倍音)
     
-    osc.start(time);
-    osc.stop(time + duration);
+    // 個別のゲインコントロールノード
+    const gain1 = this.audioContext.createGain();
+    const gain2 = this.audioContext.createGain();
+    
+    osc1.connect(gain1);
+    osc2.connect(gain2);
+    
+    // 3. 全体をまとめるマスタリング Gain
+    const masterGain = this.audioContext.createGain();
+    gain1.connect(masterGain);
+    gain2.connect(masterGain);
+    
+    // 4. 音割れを防ぎつつ、スマホスピーカーの限界まで音のエネルギー密度を圧縮するマスタリングコンプレッサー
+    const compressor = this.audioContext.createDynamicsCompressor();
+    compressor.threshold.setValueAtTime(-12, time); // 閾値を下げて全体の音エネルギーを均一化
+    compressor.knee.setValueAtTime(8, time);
+    compressor.ratio.setValueAtTime(12, time);      // 強力に圧縮して平均音圧を稼ぐ
+    compressor.attack.setValueAtTime(0.001, time);  // 1msで即圧縮作動してアタック感を維持
+    compressor.release.setValueAtTime(0.03, time);  // 30msで素早くリリースして音圧キープ
+    
+    masterGain.connect(compressor);
+    compressor.connect(this.audioContext.destination);
+    
+    // アタック 1ms の超鋭角ゲインエンベロープ
+    gain1.gain.setValueAtTime(0, time);
+    gain1.gain.linearRampToValueAtTime(0.9, time + 0.001);
+    gain1.gain.exponentialRampToValueAtTime(0.001, time + duration);
+    
+    gain2.gain.setValueAtTime(0, time);
+    gain2.gain.linearRampToValueAtTime(0.3, time + 0.001); // 矩形波を30%ブレンドして物理音圧を激増させる
+    gain2.gain.exponentialRampToValueAtTime(0.001, time + duration);
+    
+    masterGain.gain.setValueAtTime(1.0, time);
+    
+    osc1.start(time);
+    osc1.stop(time + duration);
+    osc2.start(time);
+    osc2.stop(time + duration);
     
     // 描画同期のために拍が決定されたことを main 側に知らせる
     if (this.onBeat) {
