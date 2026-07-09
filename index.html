@@ -72,74 +72,147 @@
       </div>
     </div>
 
-    <!-- メインチューナーUI -->
+    <!-- メインUIヘッダー -->
     <header class="app-header">
       <div class="header-brand">
         <span class="brand-title">Bassoon Tuner</span>
       </div>
+      <!-- ビュー切り替えタブ (Tuner / Metronome) -->
+      <div class="view-tabs">
+        <button id="tab-tuner" class="tab-btn active">Tuner</button>
+        <button id="tab-metronome" class="tab-btn">Metronome</button>
+      </div>
     </header>
 
-    <main class="tuner-main">
-      <!-- 検出されたピッチと音名表示エリア -->
-      <div class="note-display-card">
-        <div id="display-octave" class="note-octave">-</div>
-        <div id="display-note" class="note-name">--</div>
-        <div class="freq-display">
-          <span id="display-freq">--.-</span><span class="freq-unit">Hz</span>
+    <!-- チューナー・ビューパネル -->
+    <div id="tuner-view" class="view-panel active">
+      <main class="tuner-main">
+        <!-- 検出されたピッチと音名表示エリア -->
+        <div class="note-display-card">
+          <div id="display-octave" class="note-octave">-</div>
+          <div id="display-note" class="note-name">--</div>
+          <div class="freq-display">
+            <span id="display-freq">--.-</span><span class="freq-unit">Hz</span>
+          </div>
         </div>
-      </div>
 
-      <!-- メーターコンポーネント用コンテナ -->
-      <div class="meter-container">
-        <!-- アナログメーター (Canvas) -->
-        <canvas id="canvas-analog" class="meter-canvas active"></canvas>
-        
-        <!-- デジタルメーター (Canvas) -->
-        <canvas id="canvas-digital" class="meter-canvas"></canvas>
-      </div>
-    </main>
-
-    <footer class="tuner-footer">
-      <!-- 検出アルゴリズム切り替え (YIN / 自己相関) -->
-      <div class="control-group">
-        <label class="control-label">検出アルゴリズム</label>
-        <div class="algorithm-switch">
-          <button id="btn-alg-yin" class="btn-tab active">YIN (高精度・推奨)</button>
-          <button id="btn-alg-autocorr" class="btn-tab">自己相関</button>
+        <!-- メーターコンポーネント用コンテナ -->
+        <div class="meter-container">
+          <!-- アナログメーター (Canvas) -->
+          <canvas id="canvas-analog" class="meter-canvas active"></canvas>
+          
+          <!-- デジタルメーター (Canvas) -->
+          <canvas id="canvas-digital" class="meter-canvas"></canvas>
         </div>
-      </div>
+      </main>
 
-      <!-- メーターモード切り替え (アナログ / デジタル) -->
-      <div class="control-group">
-        <label class="control-label">表示モード</label>
-        <div class="view-switch">
-          <button id="btn-mode-analog" class="btn-tab active">アナログ</button>
-          <button id="btn-mode-digital" class="btn-tab">デジタル</button>
+      <footer class="tuner-footer">
+        <!-- 検出アルゴリズム切り替え (YIN / 自己相関) -->
+        <div class="control-group">
+          <label class="control-label">検出アルゴリズム</label>
+          <div class="algorithm-switch">
+            <button id="btn-alg-yin" class="btn-tab active">YIN (高精度・推奨)</button>
+            <button id="btn-alg-autocorr" class="btn-tab">自己相関</button>
+          </div>
         </div>
-      </div>
 
-      <!-- 反応速度切り替え (Fast / Normal / Stable) -->
-      <div class="control-group">
-        <label class="control-label">反応速度</label>
-        <div class="response-switch">
-          <button id="btn-speed-fast" class="btn-tab">Fast</button>
-          <button id="btn-speed-normal" class="btn-tab">Normal</button>
-          <button id="btn-speed-stable" class="btn-tab active">Stable (推奨)</button>
+        <!-- メーターモード切り替え (アナログ / デジタル) -->
+        <div class="control-group">
+          <label class="control-label">表示モード</label>
+          <div class="view-switch">
+            <button id="btn-mode-analog" class="btn-tab active">アナログ</button>
+            <button id="btn-mode-digital" class="btn-tab">デジタル</button>
+          </div>
         </div>
-      </div>
 
-      <!-- 基準ピッチ切り替え (440Hz 〜 444Hz) -->
-      <div class="control-group">
-        <label class="control-label">基準ピッチ (A4)</label>
-        <div class="pitch-selector">
-          <button class="btn-pitch" data-pitch="440">440</button>
-          <button class="btn-pitch" data-pitch="441">441</button>
-          <button class="btn-pitch active" data-pitch="442">442</button>
-          <button class="btn-pitch" data-pitch="443">443</button>
-          <button class="btn-pitch" data-pitch="444">444</button>
+        <!-- 反応速度切り替え (Fast / Normal / Stable) -->
+        <div class="control-group">
+          <label class="control-label">反応速度</label>
+          <div class="response-switch">
+            <button id="btn-speed-fast" class="btn-tab">Fast</button>
+            <button id="btn-speed-normal" class="btn-tab">Normal</button>
+            <button id="btn-speed-stable" class="btn-tab active">Stable (推奨)</button>
+          </div>
         </div>
-      </div>
-    </footer>
+
+        <!-- 基準ピッチ切り替え (440Hz 〜 444Hz) -->
+        <div class="control-group">
+          <label class="control-label">基準ピッチ (A4)</label>
+          <div class="pitch-selector">
+            <button class="btn-pitch" data-pitch="440">440</button>
+            <button class="btn-pitch" data-pitch="441">441</button>
+            <button class="btn-pitch active" data-pitch="442">442</button>
+            <button class="btn-pitch" data-pitch="443">443</button>
+            <button class="btn-pitch" data-pitch="444">444</button>
+          </div>
+        </div>
+      </footer>
+    </div>
+
+    <!-- メトロノーム・ビューパネル -->
+    <div id="metronome-view" class="view-panel">
+      <main class="metronome-main">
+        <!-- テンポ（BPM）数値表示エリア -->
+        <div class="bpm-display-card">
+          <div id="display-bpm" class="bpm-number">120</div>
+          <div class="bpm-label">BPM</div>
+        </div>
+
+        <!-- アナログ/デジタルメトロノーム Canvas -->
+        <div class="metronome-container">
+          <!-- アナログメトロノーム (Canvas) -->
+          <canvas id="canvas-metronome-analog" class="meter-canvas active"></canvas>
+          
+          <!-- デジタルメトロノーム (Canvas) -->
+          <canvas id="canvas-metronome-digital" class="meter-canvas"></canvas>
+        </div>
+      </main>
+
+      <footer class="metronome-footer">
+        <!-- 再生／停止ボタン (ゴールドテーマのプレミアムボタン) -->
+        <div class="control-row-center">
+          <button id="btn-metronome-toggle" class="btn btn-primary btn-lg">START</button>
+        </div>
+
+        <!-- テンポ調整スライダー ＆ 微調整ボタン -->
+        <div class="control-group">
+          <div class="bpm-controls-wrapper">
+            <button id="btn-bpm-minus" class="btn-bpm-adj">-</button>
+            <input type="range" id="slider-bpm" min="40" max="250" value="120" class="bpm-slider">
+            <button id="btn-bpm-plus" class="btn-bpm-adj">+</button>
+          </div>
+        </div>
+
+        <!-- TAPボタン、拍子選択、表示モード選択のグリッド -->
+        <div class="metronome-grid-controls">
+          <!-- TAPボタン -->
+          <div class="control-group">
+            <label class="control-label">TAP TEMPO</label>
+            <button id="btn-tempo-tap" class="btn btn-secondary btn-md">TAP</button>
+          </div>
+
+          <!-- 拍子選択 (2, 3, 4, 6) -->
+          <div class="control-group">
+            <label class="control-label">拍子</label>
+            <div class="beats-selector">
+              <button class="btn-pitch btn-beat" data-beat="2">2</button>
+              <button class="btn-pitch btn-beat" data-beat="3">3</button>
+              <button class="btn-pitch btn-beat active" data-beat="4">4</button>
+              <button class="btn-pitch btn-beat" data-beat="6">6</button>
+            </div>
+          </div>
+
+          <!-- メトロノーム表示モード (アナログ / デジタル) -->
+          <div class="control-group">
+            <label class="control-label">表示モード</label>
+            <div class="metro-view-switch">
+              <button id="btn-metro-mode-analog" class="btn-tab active">アナログ</button>
+              <button id="btn-metro-mode-digital" class="btn-tab">デジタル</button>
+            </div>
+          </div>
+        </div>
+      </footer>
+    </div>
   </div>
 
   <script type="module" src="/src/main.js"></script>
