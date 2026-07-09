@@ -97,6 +97,7 @@ async function initAudio() {
     // 1. AudioContext の初期化 (iOS/Safari対策のためユーザーインタラクション内で実行)
     const AudioContextClass = window.AudioContext || window.webkitAudioContext;
     audioContext = new AudioContextClass();
+    window.audioContext = audioContext; // 他のコンポーネントからグローバル参照できるようにエクスポート
 
     // 2. マイクの使用許可取得
     // 音質補正機能（エコーキャンセラー、ノイズサプレッサー、自動ゲイン調整）は

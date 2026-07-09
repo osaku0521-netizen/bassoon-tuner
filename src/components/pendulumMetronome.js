@@ -72,6 +72,32 @@ export class PendulumMetronome {
       return;
     }
     
+    // テンポ（BPM）が急激に変更されたことを検知した場合の滑らかなスイング時間スケール補正
+    const isTempoChanged = Math.abs(this.beatDuration - beatDuration) > 0.005;
+    if (isTempoChanged) {
+      const audioCtx = window.audioContext;
+      const currentTime = audioCtx ? audioCtx.currentTime : 0;
+      
+      const oldDuration = this.nextBeatTime - this.lastBeatTime;
+      if (oldDuration > 0 && currentTime >= this.lastBeatTime) {
+        // 現在のスイング進行度 (0.0 〜 1.0) を維持したまま、新しいテンポに基づいてタイムラインをアジャスト
+        let progress = (currentTime - this.lastBeatTime) / oldDuration;
+        if (progress < 0) progress = 0;
+        if (progress > 1) progress = 1;
+        
+        this.beatDuration = beatDuration;
+        this.lastBeatTime = currentTime - (beatDuration * progress);
+        this.nextBeatTime = currentTime + (beatDuration * (1 - progress));
+      } else {
+        this.beatDuration = beatDuration;
+        this.lastBeatTime = time - beatDuration;
+        this.nextBeatTime = time;
+      }
+      this.pendingBeat = null; // テンポ急変時はバッファをクリアして新タイムラインへ移行
+      this.currentBeatIdx = beatNumber;
+      return;
+    }
+    
     // 既に追跡中の予定時刻以下の古いデータ、または同じ予定時刻の重複登録は無視する
     if (time <= this.nextBeatTime) {
       return;
