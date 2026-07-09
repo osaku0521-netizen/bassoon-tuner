@@ -470,6 +470,13 @@ function startMetronome() {
   if (pendulumMetronome) pendulumMetronome.beatsPerMeasure = metroBeats;
   if (digitalMetronome) digitalMetronome.beatsPerMeasure = metroBeats;
   
+  // 最初の予備スイング区間を即座に登録して動き出しを滑らかにする
+  const secondsPerBeat = 60.0 / metroBpm;
+  const startTime = audioContext.currentTime;
+  const firstBeatTime = startTime + secondsPerBeat;
+  if (pendulumMetronome) pendulumMetronome.resetToStart(startTime, firstBeatTime, metroBpm);
+  if (digitalMetronome) digitalMetronome.resetToStart(startTime, firstBeatTime);
+  
   metronomeScheduler.setBpm(metroBpm);
   metronomeScheduler.setBeatsPerMeasure(metroBeats);
   

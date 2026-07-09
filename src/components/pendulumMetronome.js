@@ -40,6 +40,20 @@ export class PendulumMetronome {
   }
 
   /**
+   * 再生開始時にフロントエンド主導で最初のスイング期間を即座に登録
+   * @param {number} startTime 
+   * @param {number} firstBeatTime 
+   * @param {number} bpm 
+   */
+  resetToStart(startTime, firstBeatTime, bpm) {
+    this.beatDuration = 60.0 / bpm;
+    this.lastBeatTime = startTime;
+    this.nextBeatTime = firstBeatTime;
+    this.direction = 1; // 1拍目へ向けて左端から右端へスイング
+    this.pendingBeat = null;
+  }
+
+  /**
    * スケジューラー側で拍が登録されたタイミングで呼び出し、同期点を登録
    * @param {number} beatNumber 
    * @param {number} time 
@@ -48,17 +62,26 @@ export class PendulumMetronome {
   registerBeat(beatNumber, time, bpm) {
     const beatDuration = 60.0 / bpm;
     
-    // 停止中からの開始時、または初回の登録時
+    // 停止中からの開始時、または初期値未設定時
     if (this.nextBeatTime === 0 || this.lastBeatTime === 0) {
       this.beatDuration = beatDuration;
       this.lastBeatTime = time - beatDuration;
       this.nextBeatTime = time;
-      this.direction = 1; // 初回は左端からスタートして右端（direction = 1）へ向けてスイングする
+      this.direction = 1;
       this.pendingBeat = null;
-    } else {
-      // スイング中の場合は、現在のスイングが完了するまで新しい拍をバッファに留める（ガタつき・ワープ防止）
-      this.pendingBeat = { beatNumber, time, beatDuration };
+      return;
     }
+    
+    // 既に追跡中の予定時刻以下の古いデータ、または同じ予定時刻の重複登録は無視する
+    if (time <= this.nextBeatTime) {
+      return;
+    }
+    if (this.pendingBeat && this.pendingBeat.time === time) {
+      return;
+    }
+    
+    // スイングが途切れないよう、次の拍のスイング予定をバッファに積む
+    this.pendingBeat = { beatNumber, time, beatDuration };
   }
 
   /**
@@ -75,21 +98,26 @@ export class PendulumMetronome {
       if (this.width === 0 || this.height === 0) return;
     }
 
-    // 拍の切り替えタイミング監視（バッファから昇格）
-    // 現在時刻が予定時刻（nextBeatTime）に達した瞬間に、次の予定スイングに滑らかに遷移させる
-    if (isPlaying && this.pendingBeat && currentTime >= this.nextBeatTime) {
-      this.lastBeatTime = this.nextBeatTime;
-      this.nextBeatTime = this.pendingBeat.time;
-      this.beatDuration = this.pendingBeat.beatDuration;
-      
-      // 1拍子の場合は単純に毎回方向を反転させることで、1拍子でも左右にダイナミックにスイングさせる
-      if (this.beatsPerMeasure === 1) {
-        this.direction = -this.direction;
+    // 拍の切り替えタイミング監視（自律予測またはバッファからの昇格）
+    if (isPlaying && currentTime >= this.nextBeatTime) {
+      if (this.pendingBeat) {
+        // 先読みされた次の拍データがあれば、その正確な時間に同期して昇格させる
+        this.lastBeatTime = this.nextBeatTime;
+        this.nextBeatTime = this.pendingBeat.time;
+        this.beatDuration = this.pendingBeat.beatDuration;
+        
+        if (this.beatsPerMeasure === 1) {
+          this.direction = -this.direction;
+        } else {
+          this.direction = this.pendingBeat.beatNumber % 2 === 0 ? 1 : -1;
+        }
+        this.pendingBeat = null;
       } else {
-        this.direction = this.pendingBeat.beatNumber % 2 === 0 ? 1 : -1;
+        // 先読みデータがまだ届いていない場合は、現在のテンポに基づいて自律予測でスイングを折り返す
+        this.lastBeatTime = this.nextBeatTime;
+        this.nextBeatTime = this.nextBeatTime + this.beatDuration;
+        this.direction = -this.direction; // スイング方向反転
       }
-      
-      this.pendingBeat = null;
     }
 
     const ctx = this.ctx;

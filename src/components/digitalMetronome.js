@@ -33,6 +33,17 @@ export class DigitalMetronome {
   }
 
   /**
+   * 再生開始時にフロントエンド主導で最初のスイング期間を即座に登録
+   * @param {number} startTime 
+   * @param {number} firstBeatTime 
+   */
+  resetToStart(startTime, firstBeatTime) {
+    this.activeBeat = 0;
+    this.lastTriggerTime = firstBeatTime;
+    this.pendingBeat = null;
+  }
+
+  /**
    * スケジューラー側で拍が登録されたタイミングで同期
    * @param {number} beatNumber 
    * @param {number} time 
@@ -46,10 +57,19 @@ export class DigitalMetronome {
       this.activeBeat = beatNumber;
       this.lastTriggerTime = time;
       this.pendingBeat = null;
-    } else {
-      // 2回目以降は、現在進行中のビートタイミングを邪魔しないようにバッファへ留める
-      this.pendingBeat = { beatNumber, time };
+      return;
     }
+    
+    // 既に追跡中の予定時刻以下の古いデータ、または同じ予定時刻の重複登録は無視する
+    if (time <= this.lastTriggerTime) {
+      return;
+    }
+    if (this.pendingBeat && this.pendingBeat.time === time) {
+      return;
+    }
+    
+    // 2回目以降は、現在進行中のビートタイミングを邪魔しないようにバッファへ留める
+    this.pendingBeat = { beatNumber, time };
   }
 
   /**
@@ -133,18 +153,22 @@ export class DigitalMetronome {
       
       if (isCurrent) {
         // 点灯状態: ネオン風ゴールドグラデーション
+        // flashAlpha に連動させて動的に明滅（BPM=1でもピカピカと明滅）させる
+        // 最低光量 (0.2) から最大光量 (1.0) へアタックフェード
+        const intensity = 0.2 + 0.8 * flashAlpha;
+        
         ctx.shadowColor = '#d4af37';
-        ctx.shadowBlur = 16;
+        ctx.shadowBlur = 16 * intensity;
         
         const grad = ctx.createRadialGradient(x, y, 1.5, x, y, radius);
         if (isFirstBeat) {
-          grad.addColorStop(0, '#ffffff');
-          grad.addColorStop(0.35, '#fcf6ba');
-          grad.addColorStop(1, '#d4af37');
+          grad.addColorStop(0, `rgba(255, 255, 255, ${intensity})`);
+          grad.addColorStop(0.35, `rgba(252, 246, 186, ${intensity})`);
+          grad.addColorStop(1, `rgba(212, 175, 55, ${intensity})`);
         } else {
-          grad.addColorStop(0, '#ffffff');
-          grad.addColorStop(0.4, '#d4af37');
-          grad.addColorStop(1, '#b5952b');
+          grad.addColorStop(0, `rgba(255, 255, 255, ${intensity})`);
+          grad.addColorStop(0.4, `rgba(212, 175, 55, ${intensity})`);
+          grad.addColorStop(1, `rgba(181, 149, 43, ${intensity})`);
         }
         ctx.fillStyle = grad;
       } else {
