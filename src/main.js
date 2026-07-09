@@ -513,9 +513,37 @@ btnMetronomeToggle.addEventListener('click', () => {
 });
 
 /**
- * BPM設定を更新
+ * TAPボタンが押された瞬間の短い確認音（タップフィードバック音）を再生
  */
-function updateBpm(bpm) {
+function playTapFeedback() {
+  if (!audioContext) return;
+  if (audioContext.state === 'suspended') {
+    audioContext.resume();
+  }
+  
+  const osc = audioContext.createOscillator();
+  const gainNode = audioContext.createGain();
+  
+  osc.connect(gainNode);
+  gainNode.connect(audioContext.destination);
+  
+  osc.type = 'sine';
+  osc.frequency.value = 1400; // 耳に届きやすい高めの確認音
+  
+  const now = audioContext.currentTime;
+  gainNode.gain.setValueAtTime(0.3, now);
+  gainNode.gain.exponentialRampToValueAtTime(0.001, now + 0.03); // 30ms の超短音
+  
+  osc.start(now);
+  osc.stop(now + 0.03);
+}
+
+/**
+ * BPM設定を更新
+ * @param {number} bpm 
+ * @param {boolean} shouldRestart 再生中の場合に即時再起動してテンポ変更を反映させるかどうか
+ */
+function updateBpm(bpm, shouldRestart = true) {
   metroBpm = Math.max(40, Math.min(250, bpm));
   sliderBpm.value = metroBpm;
   displayBpm.textContent = metroBpm;
@@ -523,25 +551,38 @@ function updateBpm(bpm) {
   if (metronomeScheduler) {
     metronomeScheduler.setBpm(metroBpm);
   }
+  
+  // テンポ変更時に即座にスイングと音の同期をリセット＆再アラインする
+  if (isMetroPlaying && shouldRestart) {
+    stopMetronome();
+    startMetronome();
+  }
 }
 
 // BPMスライダー
 sliderBpm.addEventListener('input', (e) => {
-  updateBpm(parseInt(e.target.value, 10));
+  updateBpm(parseInt(e.target.value, 10), false); // ドラッグ中は音途切れを防ぐため再起動しない
+});
+
+sliderBpm.addEventListener('change', (e) => {
+  updateBpm(parseInt(e.target.value, 10), true);  // ドラッグが完了（指を離した）した瞬間に再起動して即時同期
 });
 
 // 微調節ボタン (-)
 btnBpmMinus.addEventListener('click', () => {
-  updateBpm(metroBpm - 1);
+  updateBpm(metroBpm - 1, true);
 });
 
 // 微調節ボタン (+)
 btnBpmPlus.addEventListener('click', () => {
-  updateBpm(metroBpm + 1);
+  updateBpm(metroBpm + 1, true);
 });
 
 // タップテンポ (Tap Tempo)
 btnTempoTap.addEventListener('click', () => {
+  // タップ音を即座に鳴らして操作フィードバックを返す
+  playTapFeedback();
+
   const now = performance.now();
   
   // 前回タップから2秒以上空いたらリセット
@@ -558,14 +599,13 @@ btnTempoTap.addEventListener('click', () => {
     }
     const avgInterval = sumIntervals / (tapTimes.length - 1);
     const calculatedBpm = Math.round(60000 / avgInterval);
-    updateBpm(calculatedBpm);
+    updateBpm(calculatedBpm, true); // TAPされた瞬間に即時再起動して拍の頭を完全に同期！
   }
   
   if (tapTimes.length > 5) {
     tapTimes.shift(); // 直近5タップ分に制限
   }
   
-  // タップ感向上のためスケールエフェクトを適用
   btnTempoTap.style.transform = 'scale(0.95)';
   setTimeout(() => {
     btnTempoTap.style.transform = '';
