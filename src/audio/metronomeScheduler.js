@@ -106,18 +106,21 @@ export class MetronomeScheduler {
     osc.connect(gainNode);
     gainNode.connect(this.audioContext.destination);
     
-    // 1拍目（アクセント拍）は高音、それ以外は低音にする
+    // サイン波よりも倍音が豊かで管楽器の演奏中でも耳通りが良い「三角波（triangle）」を採用
+    osc.type = 'triangle';
+    
+    // 周波数を少し高めに設定して耳への通りをさらに改善
     if (beatNumber === 0) {
-      osc.frequency.value = 1000; // チッ
+      osc.frequency.value = 1200; // 1拍目 (高音の鋭いクリック)
     } else {
-      osc.frequency.value = 800;  // ポッ
+      osc.frequency.value = 900;  // 2拍目以降 (少し低めのクリック)
     }
     
-    // アタックとリリース (エンベロープ) の精密スケジュール
-    const duration = 0.05; // 50ms の短い音
+    // アタックとリリースの精密スケジュール (最大ゲインを 1.0 に設定)
+    const duration = 0.07; // 70ms にわずかに伸ばして音圧（エネルギー）を確保
     gainNode.gain.setValueAtTime(0, time);
-    gainNode.gain.linearRampToValueAtTime(0.6, time + 0.003); // アタック
-    gainNode.gain.exponentialRampToValueAtTime(0.001, time + duration); // リリース (自然な減衰)
+    gainNode.gain.linearRampToValueAtTime(1.0, time + 0.001); // 1ms の超鋭いアタックで「カチッ」というアタック感を極限まで高める
+    gainNode.gain.exponentialRampToValueAtTime(0.001, time + duration); // リリース
     
     osc.start(time);
     osc.stop(time + duration);
